@@ -5,6 +5,9 @@ let data = loadData();
 let selectedPersonId = data.people[0]?.id ?? null;
 let selectedFilter = selectedPersonId ?? "all";
 
+const qs = new URLSearchParams(location.search);
+const routeUserId = qs.get("user"); // אם יש, מצב משתמש
+
 const generateId = () => (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`);
 const peopleListEl = document.getElementById("people-list");
 const personFormEl = document.getElementById("person-form");
@@ -22,6 +25,20 @@ const logoutBtn = document.getElementById("logout");
 init();
 
 function init() {
+  if (routeUserId) {
+    // מצב משתמש (קריאה בלבד)
+    document.querySelector(".app-shell").hidden = true; // מסך ניהול מוסתר
+    document.querySelector(".toolbar").hidden = true; // כלי ניהול מוסתרים
+    document.getElementById("user-screen").hidden = false; // מסך משתמש מוצג
+    renderUserView(routeUserId);
+    // הרשאות התראות + טיימר מקומי
+    ensureNotificationPermission();
+    setInterval(() => renderUserView(routeUserId), 60_000);
+    // רענון ידני
+    document.getElementById("user-refresh").addEventListener("click", () => renderUserView(routeUserId, true));
+    return; // אל תריץ bindEvents/renderAll למצב ניהול
+  }
+
   ensureNotificationPermission();
   renderAll();
   bindEvents();
@@ -174,7 +191,14 @@ function renderPeople() {
     deleteBtn.textContent = "🗑️";
     deleteBtn.addEventListener("click", () => deletePerson(person.id));
 
-    actions.append(editBtn, deleteBtn);
+    const linkBtn = document.createElement("button");
+    linkBtn.className = "ghost";
+    linkBtn.type = "button";
+    linkBtn.textContent = "🔗";
+    linkBtn.title = "קישור למסך המשתמש";
+    linkBtn.addEventListener("click", () => copyInstallLink(person.id));
+
+    actions.append(editBtn, deleteBtn, linkBtn);
     li.append(nameSpan, actions);
     peopleListEl.append(li);
   });
@@ -281,6 +305,61 @@ function renderTasks() {
       li.append(header, description, meta);
       taskListEl.append(li);
     });
+}
+
+function renderUserView(userId, manual = false) {
+  const person = findPerson(userId);
+  const title = person ? `📝 המשימות של ${person.name}` : "📝 המשימות שלי";
+  document.getElementById("user-title").textContent = title;
+
+  // רק המשימות של המשתמש, מסודרות מהקרוב לרחוק
+  const tasks = (data.tasks || [])
+    .filter((t) => t.personId === userId)
+    .sort((a, b) => new Date(a.datetime) - new Date(b.datetime));
+
+  const list = document.getElementById("user-task-list");
+  list.innerHTML = "";
+  document.getElementById("user-task-count").textContent = tasks.length;
+
+  if (!tasks.length) {
+    const li = document.createElement("li");
+    li.textContent = "אין משימות להצגה";
+    li.className = "empty";
+    list.append(li);
+    return;
+  }
+
+  tasks.forEach((t) => {
+    const li = document.createElement("li");
+
+    const header = document.createElement("div");
+    header.className = "task-header";
+    const titleEl = document.createElement("strong");
+    titleEl.textContent = t.title || "ללא כותרת";
+    header.append(titleEl);
+
+    const desc = document.createElement("p");
+    desc.textContent = t.description || "—";
+
+    const meta = document.createElement("div");
+    meta.className = "task-meta";
+    const time = document.createElement("span");
+    time.textContent = `🕒 ${formatDateTime(t.datetime)}`;
+    const reminder = document.createElement("span");
+    reminder.textContent = `⏰ ${t.reminderBefore || 0} דק' לפני`;
+    if (t.recurring && t.recurring !== "none") {
+      const rec = document.createElement("span");
+      rec.textContent = t.recurring === "daily" ? "🔁 יומי" : "🔁 שבועי";
+      meta.append(time, reminder, rec);
+    } else {
+      meta.append(time, reminder);
+    }
+
+    li.append(header, desc, meta);
+    list.append(li);
+  });
+
+  if (manual) showToast("עודכן");
 }
 
 function getFilteredTasks() {
@@ -439,6 +518,17 @@ function computeNextOccurrence(date, recurring, now) {
     result.setDate(result.getDate() + increment);
   } while (result.getTime() <= now);
   return result;
+}
+
+function copyInstallLink(personId) {
+  // קישור קבוע: אותו index, עם פרמטר ?user=<id>
+  const url = `${location.origin}${location.pathname}?user=${encodeURIComponent(personId)}`;
+  navigator.clipboard?.writeText(url).then(
+    () => showToast("קישור הועתק"),
+    () => {
+      prompt("העתק קישור התקנה:", url);
+    }
+  );
 }
 
 function ensureNotificationPermission() {

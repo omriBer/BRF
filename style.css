@@ -359,3 +359,11 @@ button:active {
   margin: 0.4rem 0;
   color: var(--text);
 }
+
+/* User screen */
+#user-screen[hidden] { display: none; }
+.user-header {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 12px 8px;
+}
+.hint { opacity: .75; font-size: .9rem; padding: 8px; }

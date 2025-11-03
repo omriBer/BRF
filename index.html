@@ -86,6 +86,26 @@
     </main>
   </div>
 
+  <!-- מסך משתמש (קריאה בלבד) -->
+  <section id="user-screen" class="screen" hidden aria-label="משימות שלי">
+    <header class="user-header">
+      <h1 id="user-title">📝 המשימות שלי</h1>
+      <button id="user-refresh" class="ghost" type="button">🔄 רענון</button>
+    </header>
+
+    <section class="card">
+      <div class="card-header">
+        <h2>📋 הקרובות</h2>
+        <span id="user-task-count" class="count">0</span>
+      </div>
+      <ul id="user-task-list" class="item-list tasks"></ul>
+    </section>
+
+    <p class="hint">
+      טיפ: הוסף למסך הבית ואז אפשר התראות. ב-iOS יש לוודא שהאפליקציה מותקנת כ-PWA.
+    </p>
+  </section>
+
   <footer class="toolbar">
     <button id="save-all" class="primary">💾 שמור הכל</button>
     <button id="check-now" class="ghost">🔔 בדיקה עכשיו</button>
