@@ -1,4 +1,4 @@
-
+<script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
   import { getMessaging, getToken, onMessage } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-messaging.js";
 
