@@ -338,8 +338,14 @@ function editTask(taskId) {
       chosenPersonId = data.people[personIndex].id;
     }
   }
-  const newRecurring = prompt("חזרה (none/daily/weekly)", task.recurring || "none") ?? task.recurring || "none";
+  
+const newRecurring =  (prompt("חזרה (none/daily/weekly)", task.recurring || "none") ?? task.recurring) || "none";
 
+
+
+
+
+  
   if (newTitle.trim()) task.title = newTitle.trim();
   task.description = newDescription.trim();
   const parsedReminder = Number(newReminder);
