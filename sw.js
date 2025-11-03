@@ -1,3 +1,4 @@
+// Core PWA service worker. Firebase Cloud Messaging runs via firebase-messaging-sw.js.
 self.addEventListener("install", (event) => {
   self.skipWaiting();
 });
