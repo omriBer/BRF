@@ -5,55 +5,48 @@ let data = loadData();
 let selectedPersonId = data.people[0]?.id ?? null;
 let selectedFilter = selectedPersonId ?? "all";
 
-const qs = new URLSearchParams(location.search);
-const routeUserId = qs.get("user"); // אם יש, מצב משתמש
+const routeUserId = new URLSearchParams(location.search).get("user");
 
 const generateId = () => (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`);
 const peopleListEl = document.getElementById("people-list");
 const personFormEl = document.getElementById("person-form");
 const personNameInput = document.getElementById("person-name");
-const addPersonBtn = document.getElementById("add-person-btn");
 const personFilterEl = document.getElementById("person-filter");
 const taskFormEl = document.getElementById("task-form");
 const taskFormPersonSelect = taskFormEl.querySelector("select[name='personId']");
 const taskListEl = document.getElementById("task-list");
 const taskCountEl = document.getElementById("task-count");
-const saveAllBtn = document.getElementById("save-all");
-const checkNowBtn = document.getElementById("check-now");
-const logoutBtn = document.getElementById("logout");
 
 init();
 
 function init() {
   if (routeUserId) {
-    // מצב משתמש (קריאה בלבד)
-    document.querySelector(".app-shell").hidden = true; // מסך ניהול מוסתר
-    document.querySelector(".toolbar").hidden = true; // כלי ניהול מוסתרים
-    document.getElementById("user-screen").hidden = false; // מסך משתמש מוצג
-    renderUserView(routeUserId);
-    // הרשאות התראות + טיימר מקומי
+    // מצב משתמש: קריאה בלבד
     ensureNotificationPermission();
-    setInterval(() => renderUserView(routeUserId), 60_000);
-    // רענון ידני
-    document.getElementById("user-refresh").addEventListener("click", () => renderUserView(routeUserId, true));
-    return; // אל תריץ bindEvents/renderAll למצב ניהול
+    renderUserView(routeUserId);
+    checkRemindersForUser(routeUserId);
+    setInterval(() => {
+      checkRemindersForUser(routeUserId);
+      renderUserView(routeUserId);
+    }, 60_000);
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("sw.js").catch(console.error);
+    }
+    return; // לא מריצים bindEvents/renderAll
   }
 
+  // מצב ניהול (כרגיל)
   ensureNotificationPermission();
   renderAll();
   bindEvents();
   checkReminders();
   setInterval(checkReminders, 60_000);
   if ("serviceWorker" in navigator) {
-    navigator.serviceWorker.register("sw.js").catch((err) => console.error("SW registration failed", err));
+    navigator.serviceWorker.register("sw.js").catch(console.error);
   }
 }
 
 function bindEvents() {
-  addPersonBtn.addEventListener("click", () => {
-    personNameInput.focus();
-  });
-
   personFormEl.addEventListener("submit", (event) => {
     event.preventDefault();
     const name = personNameInput.value.trim();
@@ -104,27 +97,6 @@ function bindEvents() {
       taskFormPersonSelect.value = defaultPerson;
     }
     persistAndRender();
-  });
-
-  saveAllBtn.addEventListener("click", () => {
-    saveData();
-    showToast("הנתונים נשמרו בהצלחה.");
-  });
-
-  checkNowBtn.addEventListener("click", () => {
-    checkReminders();
-    showToast("התזכורות נבדקו.");
-  });
-
-  logoutBtn.addEventListener("click", () => {
-    const confirmReset = confirm("האם למחוק את כל הנתונים המקומיים ולבצע אתחול?");
-    if (confirmReset) {
-      localStorage.removeItem(STORAGE_KEY);
-      data = clone(DEFAULT_DATA);
-      selectedPersonId = null;
-      selectedFilter = "all";
-      renderAll();
-    }
   });
 }
 
@@ -310,56 +282,85 @@ function renderTasks() {
 function renderUserView(userId, manual = false) {
   const person = findPerson(userId);
   const title = person ? `📝 המשימות של ${person.name}` : "📝 המשימות שלי";
-  document.getElementById("user-title").textContent = title;
+  const titleEl = document.getElementById("user-title");
+  if (titleEl) titleEl.textContent = title;
 
-  // רק המשימות של המשתמש, מסודרות מהקרוב לרחוק
   const tasks = (data.tasks || [])
-    .filter((t) => t.personId === userId)
-    .sort((a, b) => new Date(a.datetime) - new Date(b.datetime));
+    .filter(t => t.personId === userId)
+    .sort((a,b) => new Date(a.datetime) - new Date(b.datetime));
 
   const list = document.getElementById("user-task-list");
-  list.innerHTML = "";
-  document.getElementById("user-task-count").textContent = tasks.length;
-
-  if (!tasks.length) {
-    const li = document.createElement("li");
-    li.textContent = "אין משימות להצגה";
-    li.className = "empty";
-    list.append(li);
-    return;
-  }
-
-  tasks.forEach((t) => {
-    const li = document.createElement("li");
-
-    const header = document.createElement("div");
-    header.className = "task-header";
-    const titleEl = document.createElement("strong");
-    titleEl.textContent = t.title || "ללא כותרת";
-    header.append(titleEl);
-
-    const desc = document.createElement("p");
-    desc.textContent = t.description || "—";
-
-    const meta = document.createElement("div");
-    meta.className = "task-meta";
-    const time = document.createElement("span");
-    time.textContent = `🕒 ${formatDateTime(t.datetime)}`;
-    const reminder = document.createElement("span");
-    reminder.textContent = `⏰ ${t.reminderBefore || 0} דק' לפני`;
-    if (t.recurring && t.recurring !== "none") {
-      const rec = document.createElement("span");
-      rec.textContent = t.recurring === "daily" ? "🔁 יומי" : "🔁 שבועי";
-      meta.append(time, reminder, rec);
+  const count = document.getElementById("user-task-count");
+  if (count) count.textContent = tasks.length;
+  if (list) {
+    list.innerHTML = "";
+    if (!tasks.length) {
+      const li = document.createElement("li");
+      li.textContent = "אין משימות להצגה";
+      li.className = "empty";
+      list.append(li);
     } else {
-      meta.append(time, reminder);
+      tasks.forEach(t => {
+        const li = document.createElement("li");
+        const header = document.createElement("div");
+        header.className = "task-header";
+        const strong = document.createElement("strong");
+        strong.textContent = t.title || "ללא כותרת";
+        header.append(strong);
+
+        const desc = document.createElement("p");
+        desc.textContent = t.description || "—";
+
+        const meta = document.createElement("div");
+        meta.className = "task-meta";
+        const time = document.createElement("span");
+        time.textContent = `🕒 ${formatDateTime(t.datetime)}`;
+        const reminder = document.createElement("span");
+        reminder.textContent = `⏰ ${t.reminderBefore || 0} דק' לפני`;
+        meta.append(time, reminder);
+        if (t.recurring && t.recurring !== "none") {
+          const rec = document.createElement("span");
+          rec.textContent = t.recurring === "daily" ? "🔁 יומי" : "🔁 שבועי";
+          meta.append(rec);
+        }
+
+        li.append(header, desc, meta);
+        list.append(li);
+      });
     }
+  }
+  const refreshBtn = document.getElementById("user-refresh");
+  if (refreshBtn && !refreshBtn.dataset.bound) {
+    refreshBtn.dataset.bound = "1";
+    refreshBtn.addEventListener("click", () => renderUserView(userId, true));
+  }
+  if (manual) showToast && showToast("עודכן");
+}
 
-    li.append(header, desc, meta);
-    list.append(li);
+function checkRemindersForUser(userId) {
+  const now = Date.now();
+  let dirty = false;
+  (data.tasks || []).forEach((task) => {
+    if (task.personId !== userId) return;
+    const reminderBeforeMs = Number(task.reminderBefore || 0) * 60_000;
+    const taskTime = new Date(task.datetime).getTime();
+    const reminderTime = taskTime - reminderBeforeMs;
+    if (!Number.isFinite(taskTime) || !Number.isFinite(reminderTime)) return;
+    if (shouldNotify(task, now, reminderTime)) {
+      notifyTask(task);
+      task.lastReminderSent = new Date(now).toISOString();
+      dirty = true;
+    }
+    if (task.recurring && task.recurring !== "none" && now >= taskTime) {
+      const nextDate = computeNextOccurrence(new Date(task.datetime), task.recurring, now);
+      if (nextDate) {
+        task.datetime = nextDate.toISOString();
+        task.lastReminderSent = null;
+        dirty = true;
+      }
+    }
   });
-
-  if (manual) showToast("עודכן");
+  if (dirty) saveData();
 }
 
 function getFilteredTasks() {
@@ -404,27 +405,32 @@ function deletePerson(personId) {
 function editTask(taskId) {
   const task = data.tasks.find((t) => t.id === taskId);
   if (!task) return;
+
   const newTitle = prompt("עדכון כותרת", task.title) ?? task.title;
   const newDescription = prompt("עדכון תיאור", task.description) ?? task.description;
   const newReminder = prompt("תזכורת (בדקות לפני)", String(task.reminderBefore ?? 0));
-  const newDateInput = prompt("עדכון תאריך ושעה (YYYY-MM-DDTHH:MM)", toInputValue(task.datetime)) ?? toInputValue(task.datetime);
+  const newDateInput =
+    prompt("עדכון תאריך ושעה (YYYY-MM-DDTHH:MM)", toInputValue(task.datetime)) ??
+    toInputValue(task.datetime);
+
   let chosenPersonId = task.personId;
   if (data.people.length) {
-    const personMap = data.people.map((person, index) => `${index + 1}. ${person.name}`).join('\n');
-    const personChoice = prompt(`בחרו אדם למשימה:\n${personMap}`, String(data.people.findIndex((p) => p.id === task.personId) + 1));
+    const personMap = data.people
+      .map((person, index) => `${index + 1}. ${person.name}`)
+      .join('\n');
+    const personChoice = prompt(
+      `בחרו אדם למשימה:\n${personMap}`,
+      String(data.people.findIndex((p) => p.id === task.personId) + 1)
+    );
     const personIndex = Number(personChoice) - 1;
     if (!Number.isNaN(personIndex) && data.people[personIndex]) {
       chosenPersonId = data.people[personIndex].id;
     }
   }
-  
-const newRecurring =  (prompt("חזרה (none/daily/weekly)", task.recurring || "none") ?? task.recurring) || "none";
 
+  const newRecurring =
+    (prompt("חזרה (none/daily/weekly)", task.recurring || "none") ?? task.recurring) || "none";
 
-
-
-
-  
   if (newTitle.trim()) task.title = newTitle.trim();
   task.description = newDescription.trim();
   const parsedReminder = Number(newReminder);

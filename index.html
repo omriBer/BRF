@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="he" dir="rtl">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="windows-1255">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>BRF - מנהל המשימות המשפחתי</title>
   <meta name="theme-color" content="#1976D2">
@@ -10,13 +10,18 @@
   <link rel="stylesheet" href="style.css">
   <link rel="icon" href="icon-192.png">
   <link rel="apple-touch-icon" href="icon-180.png">
+  <script>
+    (function () {
+      var u = new URLSearchParams(location.search).get('user');
+      if (u) { document.documentElement.className += ' user-mode'; }
+    })();
+  </script>
 </head>
 <body>
   <div class="app-shell">
     <aside class="sidebar" aria-label="אנשים במשפחה">
       <div class="sidebar-header">
         <h2>👪 אנשים במשפחה</h2>
-        <button id="add-person-btn" class="ghost" type="button">➕</button>
       </div>
       <nav>
         <ul id="people-list" class="item-list"></ul>
@@ -87,7 +92,7 @@
   </div>
 
   <!-- מסך משתמש (קריאה בלבד) -->
-  <section id="user-screen" class="screen" hidden aria-label="משימות שלי">
+  <section id="user-screen" aria-label="משימות שלי">
     <header class="user-header">
       <h1 id="user-title">📝 המשימות שלי</h1>
       <button id="user-refresh" class="ghost" type="button">🔄 רענון</button>
@@ -102,23 +107,11 @@
     </section>
 
     <p class="hint">
-      טיפ: הוסף למסך הבית ואז אפשר התראות. ב-iOS יש לוודא שהאפליקציה מותקנת כ-PWA.
+      טיפ: הוסף למסך הבית ואז אשר התראות. ב-iOS יש לוודא התקנה כ-PWA.
     </p>
   </section>
 
-  <footer class="toolbar">
-    <button id="save-all" class="primary">💾 שמור הכל</button>
-    <button id="check-now" class="ghost">🔔 בדיקה עכשיו</button>
-    <button id="logout" class="danger">🚪 יציאה</button>
-  </footer>
-
   <script src="app.js" defer></script>
 
-  <script>
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('sw.js');
-  }
-</script>
-  
 </body>
 </html>
