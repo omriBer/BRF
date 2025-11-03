@@ -1,4 +1,4 @@
-import { PeopleAPI, TasksAPI, initMessaging } from "./firebase.js";
+import { PeopleAPI, TasksAPI } from "./firebase.js";
 
 let data = { people: [], tasks: [] };
 let selectedPersonId = null;
@@ -16,6 +16,17 @@ const taskListEl = document.getElementById("task-list");
 const taskCountEl = document.getElementById("task-count");
 
 init();
+
+document.getElementById("enable-push")?.addEventListener("click", async () => {
+  if (typeof window.initMessaging === "function") {
+    const urlParams = new URLSearchParams(location.search);
+    const personId = urlParams.get("user") || null;
+    const token = await window.initMessaging(personId);
+    if (token) alert("נרשמת לקבלת התראות ✅\n(token בקונסול)");
+  } else {
+    alert("initMessaging לא נטענה — בדוק טעינת firebase.js");
+  }
+});
 
 function init() {
   if ("serviceWorker" in navigator) {
@@ -79,15 +90,6 @@ function setupUserMode(userId) {
   setInterval(() => {
     checkRemindersForUser(userId);
   }, 60_000);
-
-  const refreshBtn = document.getElementById("user-refresh");
-  if (refreshBtn && !refreshBtn.dataset.bound) {
-    refreshBtn.dataset.bound = "1";
-    refreshBtn.addEventListener("click", async () => {
-      await initMessaging(userId);
-      renderUserView(userId, true);
-    });
-  }
 }
 
 function bindEvents() {

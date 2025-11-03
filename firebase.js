@@ -1,12 +1,19 @@
-// firebase.js (ESM)
+// firebase.js
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
 import {
-  getFirestore, collection, doc, getDocs, addDoc, setDoc, updateDoc, deleteDoc,
-  onSnapshot, serverTimestamp, arrayUnion
+  getFirestore,
+  collection,
+  doc,
+  setDoc,
+  updateDoc,
+  deleteDoc,
+  addDoc,
+  onSnapshot,
+  serverTimestamp,
+  arrayUnion
 } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
 import { getMessaging, getToken, onMessage } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-messaging.js";
 
-// ----- CONFIG (השאר ערכים כפי שהוגדרו בפרויקט שלך) -----
 const firebaseConfig = {
   apiKey: "AIzaSyDdEhEqRRQDKUmTJ73c3LLKxP8s4q5WIec",
   authDomain: "mazal-family.firebaseapp.com",
@@ -15,79 +22,103 @@ const firebaseConfig = {
   messagingSenderId: "495595541465",
   appId: "1:495595541465:web:5a89f8a094876543d13fc8"
 };
-// Public VAPID from Cloud Messaging (Web Push certificates)
+
+// VAPID ציבורי שנוצר ב-FCM
 const VAPID_PUBLIC_KEY = "BN6ULGQ_WF9mXHaS26D61Yz2xyKFdxGuaj99FA6Me795kqUBh4Gu_7dAB90FkcBUuk7LyKY_IZ3QP9AalCUpjSk";
 
-// ----- INIT -----
 export const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app);
 export const messaging = getMessaging(app);
 
-// ----- Messaging init for Web Push -----
-export async function initMessaging(personId) {
-  if (!("Notification" in window)) {
-    console.warn("Notifications not supported in this browser");
+// רישום Service Worker ייעודי ל-FCM
+async function registerFcmSw() {
+  if (!("serviceWorker" in navigator)) {
+    console.warn("[FCM] serviceWorker not supported");
     return null;
   }
-  const permission = await Notification.requestPermission();
-  if (permission !== "granted") {
-    console.warn("User denied notifications");
-    return null;
-  }
-
-  // חשוב: רישום SW ייעודי ל-FCM (ברקע)
-  const reg = await navigator.serviceWorker.register("firebase-messaging-sw.js");
-
-  const token = await getToken(messaging, {
-    vapidKey: VAPID_PUBLIC_KEY,
-    serviceWorkerRegistration: reg
-  });
-  if (!token) {
-    console.warn("FCM token unavailable");
-    return null;
-  }
-
-  console.log("🔑 FCM token:", token);
-
-  // שמירת המכשיר ל-Firestore: devices + הוספה ל-people.deviceTokens
   try {
-    const platform = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) ? "mobile-web" : "web";
-    const deviceId = token.slice(0, 16); // ID קצר ממוזער
-    await setDoc(doc(db, "devices", deviceId), {
-      personId: personId || null,
-      fcmToken: token,
-      platform,
-      registeredAt: serverTimestamp()
-    });
-
-    if (personId) {
-      await updateDoc(doc(db, "people", personId), {
-        deviceTokens: arrayUnion(token),
-        updatedAt: serverTimestamp()
-      });
-    }
+    const reg = await navigator.serviceWorker.register("firebase-messaging-sw.js");
+    console.log("[FCM] SW registered:", reg.scope);
+    return reg;
   } catch (e) {
-    console.error("Failed saving device token", e);
+    console.error("[FCM] SW register failed:", e);
+    return null;
   }
-
-  // הודעות בעת שהאפליקציה פתוחה (Foreground)
-  onMessage(messaging, (payload) => {
-    const n = payload?.notification || {};
-    try {
-      new Notification(n.title || "הודעה", {
-        body: n.body || "",
-        icon: n.icon || "icons/icon-192.png"
-      });
-    } catch (_) {
-      // אם חסום, לפחות לוג
-      console.log("Message:", payload);
-    }
-  });
-
-  return token;
 }
 
-// עזרי DB ל-CRUD (ייבוא מתוך app.js)
+// פונקציה ליזום הרשאות, לקבל token ולשמור (אופציונלי) ל-Firestore
+export async function initMessaging(personId = null) {
+  try {
+    console.log("[FCM] initMessaging start");
+    if (!("Notification" in window)) {
+      console.warn("[FCM] Notifications API not supported");
+      return null;
+    }
+    const permission = await Notification.requestPermission();
+    console.log("[FCM] permission:", permission);
+    if (permission !== "granted") {
+      alert("התראות לא אושרו");
+      return null;
+    }
+
+    const reg = await registerFcmSw();
+    if (!reg) {
+      alert("רישום Service Worker נכשל");
+      return null;
+    }
+
+    const token = await getToken(messaging, { vapidKey: VAPID_PUBLIC_KEY, serviceWorkerRegistration: reg });
+    console.log("🔑 FCM token:", token);
+    if (!token) {
+      alert("לא התקבל token");
+      return null;
+    }
+
+    // שמירה אופציונלית ל-Firestore (לסיוע בדיבוג)
+    try {
+      const deviceId = token.slice(0, 16);
+      await setDoc(doc(db, "devices", deviceId), {
+        personId,
+        fcmToken: token,
+        platform: /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) ? "mobile-web" : "web",
+        registeredAt: serverTimestamp()
+      });
+      if (personId) {
+        await updateDoc(doc(db, "people", personId), {
+          deviceTokens: arrayUnion(token),
+          updatedAt: serverTimestamp()
+        });
+      }
+      console.log("[FCM] device saved");
+    } catch (e) {
+      console.warn("[FCM] save device failed:", e);
+    }
+
+    // קבלת הודעות כאשר הלשונית פתוחה
+    onMessage(messaging, (payload) => {
+      console.log("📩 onMessage:", payload);
+      const n = payload?.notification || {};
+      try {
+        new Notification(n.title || "הודעה", {
+          body: n.body || "",
+          icon: "icon-192.png"
+        });
+      } catch (e) {
+        console.log("Foreground message:", payload);
+      }
+    });
+
+    return token;
+  } catch (err) {
+    console.error("[FCM] initMessaging error:", err);
+    return null;
+  }
+}
+
+// ✅ לחשוף ל-window כדי שניתן יהיה להריץ מה-Console ומה-UI
+window.initMessaging = initMessaging;
+console.log("[FCM] window.initMessaging attached:", typeof window.initMessaging);
+
 export const PeopleAPI = {
   onSnapshot(callback) {
     return onSnapshot(collection(db, "people"), (snap) => {
@@ -98,7 +129,9 @@ export const PeopleAPI = {
   },
   async add(name) {
     const ref = await addDoc(collection(db, "people"), {
-      name, createdAt: serverTimestamp(), updatedAt: serverTimestamp()
+      name,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp()
     });
     return ref.id;
   },

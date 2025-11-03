@@ -95,7 +95,7 @@
   <section id="user-screen" aria-label="משימות שלי">
     <header class="user-header">
       <h1 id="user-title">📝 המשימות שלי</h1>
-      <button id="user-refresh" class="ghost" type="button">🔔 הפעל התראות</button>
+      <button id="enable-push" class="primary" type="button">🔔 הפעלת התראות</button>
     </header>
 
     <section class="card">
@@ -111,10 +111,8 @@
     </p>
   </section>
 
-  <!-- הפוך את app.js למודול כדי לאפשר import -->
-  <script type="module" src="app.js"></script>
-  <!-- טעינת Firebase כמודול נפרד -->
-  <script type="module" src="firebase.js"></script>
+  <script type="module" src="./app.js"></script>
+  <script type="module" src="./firebase.js"></script>
 
 </body>
 </html>
