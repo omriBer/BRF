@@ -1,111 +1,158 @@
-const STORAGE_KEY = "brfData";
-const DEFAULT_DATA = { people: [], tasks: [] };
-const clone = (value) => (typeof structuredClone === 'function' ? structuredClone(value) : JSON.parse(JSON.stringify(value)));
-let data = loadData();
-let selectedPersonId = data.people[0]?.id ?? null;
-let selectedFilter = selectedPersonId ?? "all";
+import { PeopleAPI, TasksAPI, initMessaging } from "./firebase.js";
+
+let data = { people: [], tasks: [] };
+let selectedPersonId = null;
+let selectedFilter = "all";
 
 const routeUserId = new URLSearchParams(location.search).get("user");
 
-const generateId = () => (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`);
 const peopleListEl = document.getElementById("people-list");
 const personFormEl = document.getElementById("person-form");
 const personNameInput = document.getElementById("person-name");
 const personFilterEl = document.getElementById("person-filter");
 const taskFormEl = document.getElementById("task-form");
-const taskFormPersonSelect = taskFormEl.querySelector("select[name='personId']");
+const taskFormPersonSelect = taskFormEl?.querySelector("select[name='personId']");
 const taskListEl = document.getElementById("task-list");
 const taskCountEl = document.getElementById("task-count");
 
 init();
 
 function init() {
-  if (routeUserId) {
-    // מצב משתמש: קריאה בלבד
-    ensureNotificationPermission();
-    renderUserView(routeUserId);
-    checkRemindersForUser(routeUserId);
-    setInterval(() => {
-      checkRemindersForUser(routeUserId);
-      renderUserView(routeUserId);
-    }, 60_000);
-    if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.register("sw.js").catch(console.error);
-    }
-    return; // לא מריצים bindEvents/renderAll
-  }
-
-  // מצב ניהול (כרגיל)
-  ensureNotificationPermission();
-  renderAll();
-  bindEvents();
-  checkReminders();
-  setInterval(checkReminders, 60_000);
   if ("serviceWorker" in navigator) {
     navigator.serviceWorker.register("sw.js").catch(console.error);
+  }
+
+  ensureNotificationPermission();
+  setupRealtimeListeners();
+
+  if (routeUserId) {
+    setupUserMode(routeUserId);
+  } else {
+    bindEvents();
+    checkReminders();
+    setInterval(checkReminders, 60_000);
+  }
+}
+
+function setupRealtimeListeners() {
+  PeopleAPI.onSnapshot((arr) => {
+    data.people = arr;
+    ensureSelectedDefaults();
+    if (routeUserId) {
+      renderUserView(routeUserId);
+    } else {
+      renderPeople();
+      renderPersonFilters();
+      renderTaskFormPeople();
+      renderTasks();
+    }
+  });
+
+  TasksAPI.onSnapshot((arr) => {
+    data.tasks = arr.map((t) => {
+      const normalized = { ...t };
+      if (normalized.datetime?.toDate) {
+        normalized.datetime = normalized.datetime.toDate().toISOString();
+      }
+      if (normalized.createdAt?.toDate) {
+        normalized.createdAt = normalized.createdAt.toDate().toISOString();
+      }
+      if (normalized.updatedAt?.toDate) {
+        normalized.updatedAt = normalized.updatedAt.toDate().toISOString();
+      }
+      if (normalized.lastReminderSent?.toDate) {
+        normalized.lastReminderSent = normalized.lastReminderSent.toDate().toISOString();
+      }
+      return normalized;
+    });
+    if (routeUserId) {
+      renderUserView(routeUserId);
+    } else {
+      renderTasks();
+    }
+  });
+}
+
+function setupUserMode(userId) {
+  renderUserView(userId);
+  checkRemindersForUser(userId);
+  setInterval(() => {
+    checkRemindersForUser(userId);
+  }, 60_000);
+
+  const refreshBtn = document.getElementById("user-refresh");
+  if (refreshBtn && !refreshBtn.dataset.bound) {
+    refreshBtn.dataset.bound = "1";
+    refreshBtn.addEventListener("click", async () => {
+      await initMessaging(userId);
+      renderUserView(userId, true);
+    });
   }
 }
 
 function bindEvents() {
-  personFormEl.addEventListener("submit", (event) => {
-    event.preventDefault();
-    const name = personNameInput.value.trim();
-    if (!name) return;
-    const newPerson = { id: generateId(), name };
-    data.people.push(newPerson);
-    selectedPersonId = newPerson.id;
-    selectedFilter = newPerson.id;
-    personFormEl.reset();
-    persistAndRender();
-  });
+  if (personFormEl) {
+    personFormEl.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const name = personNameInput.value.trim();
+      if (!name) return;
+      try {
+        const newPersonId = await PeopleAPI.add(name);
+        selectedPersonId = newPersonId;
+        selectedFilter = newPersonId;
+        personFormEl.reset();
+      } catch (error) {
+        console.error("Failed to add person", error);
+        alert("שגיאה בהוספת אדם");
+      }
+    });
+  }
 
-  personFilterEl.addEventListener("change", (event) => {
-    selectedFilter = event.target.value;
-    if (selectedFilter !== "all") {
-      selectedPersonId = selectedFilter;
-    }
-    renderTasks();
-  });
+  if (personFilterEl) {
+    personFilterEl.addEventListener("change", (event) => {
+      selectedFilter = event.target.value;
+      if (selectedFilter !== "all") {
+        selectedPersonId = selectedFilter;
+      }
+      renderTasks();
+    });
+  }
 
-  taskFormEl.addEventListener("submit", (event) => {
-    event.preventDefault();
-    if (!data.people.length) {
-      alert("יש להוסיף אדם לפני שיוצרים משימה.");
-      return;
-    }
-    const formData = new FormData(taskFormEl);
-    const rawDate = formData.get("datetime");
-    const parsedDate = new Date(rawDate);
-    if (!rawDate || !Number.isFinite(parsedDate.getTime())) {
-      alert("יש לבחור תאריך ושעה תקינים.");
-      return;
-    }
-    const task = {
-      id: generateId(),
-      title: formData.get("title").trim(),
-      description: (formData.get("description") || "").trim(),
-      personId: formData.get("personId"),
-      datetime: parsedDate.toISOString(),
-      reminderBefore: Number(formData.get("reminderBefore") || 0),
-      recurring: formData.get("recurring") || "none",
-      lastReminderSent: null,
-    };
-    data.tasks.push(task);
-    taskFormEl.reset();
-    const defaultPerson = selectedPersonId ?? data.people[0]?.id;
-    if (defaultPerson) {
-      taskFormPersonSelect.value = defaultPerson;
-    }
-    persistAndRender();
-  });
-}
-
-function renderAll() {
-  ensureSelectedDefaults();
-  renderPeople();
-  renderPersonFilters();
-  renderTaskFormPeople();
-  renderTasks();
+  if (taskFormEl) {
+    taskFormEl.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      if (!data.people.length) {
+        alert("יש להוסיף אדם לפני שיוצרים משימה.");
+        return;
+      }
+      const formData = new FormData(taskFormEl);
+      const rawDate = formData.get("datetime");
+      const parsedDate = new Date(rawDate);
+      if (!rawDate || !Number.isFinite(parsedDate.getTime())) {
+        alert("יש לבחור תאריך ושעה תקינים.");
+        return;
+      }
+      const task = {
+        title: formData.get("title").trim(),
+        description: (formData.get("description") || "").trim(),
+        personId: formData.get("personId"),
+        datetime: parsedDate.toISOString(),
+        reminderBefore: Number(formData.get("reminderBefore") || 0),
+        recurring: formData.get("recurring") || "none",
+      };
+      try {
+        await TasksAPI.add(task);
+        taskFormEl.reset();
+        const defaultPerson = selectedPersonId ?? data.people[0]?.id;
+        if (defaultPerson && taskFormPersonSelect) {
+          taskFormPersonSelect.value = defaultPerson;
+        }
+      } catch (error) {
+        console.error("Failed to add task", error);
+        alert("שגיאה בהוספת משימה");
+      }
+    });
+  }
 }
 
 function ensureSelectedDefaults() {
@@ -123,6 +170,7 @@ function ensureSelectedDefaults() {
 }
 
 function renderPeople() {
+  if (!peopleListEl) return;
   peopleListEl.innerHTML = "";
   if (!data.people.length) {
     const empty = document.createElement("li");
@@ -177,6 +225,7 @@ function renderPeople() {
 }
 
 function renderPersonFilters() {
+  if (!personFilterEl) return;
   personFilterEl.innerHTML = "";
   const allOption = document.createElement("option");
   allOption.value = "all";
@@ -192,6 +241,7 @@ function renderPersonFilters() {
 }
 
 function renderTaskFormPeople() {
+  if (!taskFormPersonSelect) return;
   taskFormPersonSelect.innerHTML = "";
   if (!data.people.length) {
     const option = document.createElement("option");
@@ -213,6 +263,7 @@ function renderTaskFormPeople() {
 }
 
 function renderTasks() {
+  if (!taskListEl || !taskCountEl) return;
   taskListEl.innerHTML = "";
   const tasks = getFilteredTasks();
   taskCountEl.textContent = tasks.length;
@@ -286,8 +337,8 @@ function renderUserView(userId, manual = false) {
   if (titleEl) titleEl.textContent = title;
 
   const tasks = (data.tasks || [])
-    .filter(t => t.personId === userId)
-    .sort((a,b) => new Date(a.datetime) - new Date(b.datetime));
+    .filter((t) => t.personId === userId)
+    .sort((a, b) => new Date(a.datetime) - new Date(b.datetime));
 
   const list = document.getElementById("user-task-list");
   const count = document.getElementById("user-task-count");
@@ -300,7 +351,7 @@ function renderUserView(userId, manual = false) {
       li.className = "empty";
       list.append(li);
     } else {
-      tasks.forEach(t => {
+      tasks.forEach((t) => {
         const li = document.createElement("li");
         const header = document.createElement("div");
         header.className = "task-header";
@@ -329,38 +380,7 @@ function renderUserView(userId, manual = false) {
       });
     }
   }
-  const refreshBtn = document.getElementById("user-refresh");
-  if (refreshBtn && !refreshBtn.dataset.bound) {
-    refreshBtn.dataset.bound = "1";
-    refreshBtn.addEventListener("click", () => renderUserView(userId, true));
-  }
   if (manual) showToast && showToast("עודכן");
-}
-
-function checkRemindersForUser(userId) {
-  const now = Date.now();
-  let dirty = false;
-  (data.tasks || []).forEach((task) => {
-    if (task.personId !== userId) return;
-    const reminderBeforeMs = Number(task.reminderBefore || 0) * 60_000;
-    const taskTime = new Date(task.datetime).getTime();
-    const reminderTime = taskTime - reminderBeforeMs;
-    if (!Number.isFinite(taskTime) || !Number.isFinite(reminderTime)) return;
-    if (shouldNotify(task, now, reminderTime)) {
-      notifyTask(task);
-      task.lastReminderSent = new Date(now).toISOString();
-      dirty = true;
-    }
-    if (task.recurring && task.recurring !== "none" && now >= taskTime) {
-      const nextDate = computeNextOccurrence(new Date(task.datetime), task.recurring, now);
-      if (nextDate) {
-        task.datetime = nextDate.toISOString();
-        task.lastReminderSent = null;
-        dirty = true;
-      }
-    }
-  });
-  if (dirty) saveData();
 }
 
 function getFilteredTasks() {
@@ -373,41 +393,54 @@ function getFilteredTasks() {
 function selectPerson(personId) {
   selectedPersonId = personId;
   selectedFilter = personId;
-  renderAll();
+  renderPeople();
+  renderPersonFilters();
+  renderTaskFormPeople();
+  renderTasks();
 }
 
-function editPerson(personId) {
+async function editPerson(personId) {
   const person = findPerson(personId);
   if (!person) return;
   const newName = prompt("עדכון שם", person.name);
-  if (newName && newName.trim()) {
-    person.name = newName.trim();
-    persistAndRender();
+  if (!newName || !newName.trim()) return;
+  try {
+    await PeopleAPI.rename(personId, newName.trim());
+  } catch (error) {
+    console.error("Failed to rename person", error);
+    alert("שגיאה בעדכון שם");
   }
 }
 
-function deletePerson(personId) {
+async function deletePerson(personId) {
   const person = findPerson(personId);
   if (!person) return;
   const confirmed = confirm(`למחוק את ${person.name} וכל המשימות המשויכות?`);
   if (!confirmed) return;
-  data.people = data.people.filter((p) => p.id !== personId);
-  data.tasks = data.tasks.filter((task) => task.personId !== personId);
-  if (selectedPersonId === personId) {
-    selectedPersonId = data.people[0]?.id ?? null;
+  const relatedTasks = data.tasks.filter((task) => task.personId === personId);
+  try {
+    await Promise.all([
+      PeopleAPI.remove(personId),
+      ...relatedTasks.map((task) => TasksAPI.remove(task.id)),
+    ]);
+    if (selectedPersonId === personId) {
+      selectedPersonId = null;
+    }
+    if (selectedFilter === personId) {
+      selectedFilter = "all";
+    }
+  } catch (error) {
+    console.error("Failed to delete person", error);
+    alert("שגיאה במחיקת אדם");
   }
-  if (selectedFilter === personId) {
-    selectedFilter = selectedPersonId ?? "all";
-  }
-  persistAndRender();
 }
 
-function editTask(taskId) {
+async function editTask(taskId) {
   const task = data.tasks.find((t) => t.id === taskId);
   if (!task) return;
 
-  const newTitle = prompt("עדכון כותרת", task.title) ?? task.title;
-  const newDescription = prompt("עדכון תיאור", task.description) ?? task.description;
+  const newTitle = prompt("עדכון כותרת", task.title);
+  const newDescription = prompt("עדכון תיאור", task.description);
   const newReminder = prompt("תזכורת (בדקות לפני)", String(task.reminderBefore ?? 0));
   const newDateInput =
     prompt("עדכון תאריך ושעה (YYYY-MM-DDTHH:MM)", toInputValue(task.datetime)) ??
@@ -417,7 +450,7 @@ function editTask(taskId) {
   if (data.people.length) {
     const personMap = data.people
       .map((person, index) => `${index + 1}. ${person.name}`)
-      .join('\n');
+      .join("\n");
     const personChoice = prompt(
       `בחרו אדם למשימה:\n${personMap}`,
       String(data.people.findIndex((p) => p.id === task.personId) + 1)
@@ -431,35 +464,52 @@ function editTask(taskId) {
   const newRecurring =
     (prompt("חזרה (none/daily/weekly)", task.recurring || "none") ?? task.recurring) || "none";
 
-  if (newTitle.trim()) task.title = newTitle.trim();
-  task.description = newDescription.trim();
+  const patch = {};
+  if (newTitle && newTitle.trim()) {
+    patch.title = newTitle.trim();
+  }
+  if (newDescription !== null) {
+    patch.description = (newDescription || "").trim();
+  }
   const parsedReminder = Number(newReminder);
   if (!Number.isNaN(parsedReminder) && parsedReminder >= 0) {
-    task.reminderBefore = parsedReminder;
+    patch.reminderBefore = parsedReminder;
   }
   const parsedDate = new Date(newDateInput);
   if (Number.isFinite(parsedDate.getTime())) {
-    task.datetime = parsedDate.toISOString();
+    patch.datetime = parsedDate.toISOString();
   }
-  task.personId = chosenPersonId;
+  patch.personId = chosenPersonId;
   if (["none", "daily", "weekly"].includes(newRecurring)) {
-    task.recurring = newRecurring;
+    patch.recurring = newRecurring;
   }
-  persistAndRender();
+
+  if (Object.keys(patch).length === 0) return;
+
+  try {
+    await TasksAPI.update(taskId, patch);
+  } catch (error) {
+    console.error("Failed to update task", error);
+    alert("שגיאה בעדכון משימה");
+  }
 }
 
-function deleteTask(taskId) {
+async function deleteTask(taskId) {
   const task = data.tasks.find((t) => t.id === taskId);
   if (!task) return;
   const confirmed = confirm(`למחוק את המשימה "${task.title}"?`);
   if (!confirmed) return;
-  data.tasks = data.tasks.filter((t) => t.id !== taskId);
-  persistAndRender();
+  try {
+    await TasksAPI.remove(taskId);
+  } catch (error) {
+    console.error("Failed to delete task", error);
+    alert("שגיאה במחיקת משימה");
+  }
 }
 
 function checkReminders() {
   const now = Date.now();
-  let dirty = false;
+  const patches = new Map();
   data.tasks.forEach((task) => {
     const reminderBeforeMs = Number(task.reminderBefore || 0) * 60_000;
     const taskTime = new Date(task.datetime).getTime();
@@ -469,22 +519,53 @@ function checkReminders() {
     }
     if (shouldNotify(task, now, reminderTime)) {
       notifyTask(task);
-      task.lastReminderSent = new Date(now).toISOString();
-      dirty = true;
+      const patch = patches.get(task.id) ?? {};
+      patch.lastReminderSent = new Date(now).toISOString();
+      patches.set(task.id, patch);
     }
 
     if (task.recurring && task.recurring !== "none" && now >= taskTime) {
       const nextDate = computeNextOccurrence(new Date(task.datetime), task.recurring, now);
       if (nextDate) {
-        task.datetime = nextDate.toISOString();
-        task.lastReminderSent = null;
-        dirty = true;
+        const patch = patches.get(task.id) ?? {};
+        patch.datetime = nextDate.toISOString();
+        patch.lastReminderSent = null;
+        patches.set(task.id, patch);
       }
     }
   });
-  if (dirty) {
-    saveData();
-    renderTasks();
+  if (patches.size) {
+    applyTaskPatches(patches).catch((error) => console.error("Reminder sync failed", error));
+  }
+}
+
+function checkRemindersForUser(userId) {
+  const now = Date.now();
+  const patches = new Map();
+  (data.tasks || []).forEach((task) => {
+    if (task.personId !== userId) return;
+    const reminderBeforeMs = Number(task.reminderBefore || 0) * 60_000;
+    const taskTime = new Date(task.datetime).getTime();
+    const reminderTime = taskTime - reminderBeforeMs;
+    if (!Number.isFinite(taskTime) || !Number.isFinite(reminderTime)) return;
+    if (shouldNotify(task, now, reminderTime)) {
+      notifyTask(task);
+      const patch = patches.get(task.id) ?? {};
+      patch.lastReminderSent = new Date(now).toISOString();
+      patches.set(task.id, patch);
+    }
+    if (task.recurring && task.recurring !== "none" && now >= taskTime) {
+      const nextDate = computeNextOccurrence(new Date(task.datetime), task.recurring, now);
+      if (nextDate) {
+        const patch = patches.get(task.id) ?? {};
+        patch.datetime = nextDate.toISOString();
+        patch.lastReminderSent = null;
+        patches.set(task.id, patch);
+      }
+    }
+  });
+  if (patches.size) {
+    applyTaskPatches(patches).catch((error) => console.error("Reminder sync failed", error));
   }
 }
 
@@ -527,7 +608,6 @@ function computeNextOccurrence(date, recurring, now) {
 }
 
 function copyInstallLink(personId) {
-  // קישור קבוע: אותו index, עם פרמטר ?user=<id>
   const url = `${location.origin}${location.pathname}?user=${encodeURIComponent(personId)}`;
   navigator.clipboard?.writeText(url).then(
     () => showToast("קישור הועתק"),
@@ -550,9 +630,9 @@ function findPerson(id) {
 }
 
 function toInputValue(dateString) {
-  if (!dateString) return '';
+  if (!dateString) return "";
   const date = new Date(dateString);
-  if (!Number.isFinite(date.getTime())) return '';
+  if (!Number.isFinite(date.getTime())) return "";
   const iso = date.toISOString();
   return iso.slice(0, 16);
 }
@@ -567,11 +647,6 @@ function formatDateTime(dateString) {
   }).format(date);
 }
 
-function persistAndRender() {
-  saveData();
-  renderAll();
-}
-
 function showToast(message) {
   const toast = document.createElement("div");
   toast.className = "toast";
@@ -584,23 +659,7 @@ function showToast(message) {
   }, 2200);
 }
 
-function saveData() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-}
-
-function loadData() {
-  const raw = localStorage.getItem(STORAGE_KEY);
-  if (!raw) return clone(DEFAULT_DATA);
-  try {
-    const parsed = JSON.parse(raw);
-    return {
-      people: Array.isArray(parsed.people) ? parsed.people : [],
-      tasks: Array.isArray(parsed.tasks)
-        ? parsed.tasks.map((task) => ({ ...task, lastReminderSent: task.lastReminderSent ?? null }))
-        : [],
-    };
-  } catch (error) {
-    console.warn("שמירת נתונים פגומה, מאתחל נתונים", error);
-    return clone(DEFAULT_DATA);
-  }
+async function applyTaskPatches(patches) {
+  const entries = Array.from(patches.entries());
+  await Promise.all(entries.map(([id, patch]) => TasksAPI.update(id, patch)));
 }
