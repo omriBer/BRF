@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BRF - מנהל המשימות המשפחתי</title>
+  <meta name="theme-color" content="#1976D2">
+  <meta name="description" content="מנהל משימות משפחתי עם תזכורות והתראות בעברית">
+  <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="style.css">
+  <link rel="icon" href="icons/icon-192.png">
+  <link rel="apple-touch-icon" href="icons/icon-180.png">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar" aria-label="אנשים במשפחה">
+      <div class="sidebar-header">
+        <h2>👪 אנשים במשפחה</h2>
+        <button id="add-person-btn" class="ghost" type="button">➕</button>
+      </div>
+      <nav>
+        <ul id="people-list" class="item-list"></ul>
+      </nav>
+      <form id="person-form" class="inline-form" autocomplete="off">
+        <label for="person-name" class="visually-hidden">שם חדש</label>
+        <input id="person-name" name="person-name" type="text" placeholder="שם חדש" required>
+        <button type="submit" class="primary">הוסף</button>
+      </form>
+    </aside>
+    <main class="main" aria-label="משימות">
+      <header class="main-header">
+        <div>
+          <h1>📝 משימות</h1>
+          <p class="subtitle">לו"ז משפחתי מסונכרן תמיד</p>
+        </div>
+        <div class="filters">
+          <label for="person-filter">הצג משימות של:</label>
+          <select id="person-filter"></select>
+        </div>
+      </header>
+
+      <section class="card" aria-labelledby="task-form-title">
+        <h2 id="task-form-title">➕ הוספת משימה</h2>
+        <form id="task-form" autocomplete="off">
+          <div class="form-grid">
+            <label>
+              כותרת
+              <input type="text" name="title" required>
+            </label>
+            <label>
+              תיאור
+              <textarea name="description" rows="2" placeholder="פרטים נוספים"></textarea>
+            </label>
+            <label>
+              שייך ל-
+              <select name="personId" required></select>
+            </label>
+            <label>
+              תאריך ושעה
+              <input type="datetime-local" name="datetime" required>
+            </label>
+            <label>
+              תזכורת (דקות לפני)
+              <input type="number" name="reminderBefore" min="0" step="5" value="0">
+            </label>
+            <label>
+              חזרה
+              <select name="recurring">
+                <option value="none">ללא</option>
+                <option value="daily">יומי</option>
+                <option value="weekly">שבועי</option>
+              </select>
+            </label>
+          </div>
+          <button type="submit" class="accent">הוסף משימה</button>
+        </form>
+      </section>
+
+      <section class="card" aria-labelledby="task-list-title">
+        <div class="card-header">
+          <h2 id="task-list-title">📋 רשימת משימות</h2>
+          <span id="task-count" class="count">0</span>
+        </div>
+        <ul id="task-list" class="item-list tasks"></ul>
+      </section>
+    </main>
+  </div>
+
+  <footer class="toolbar">
+    <button id="save-all" class="primary">💾 שמור הכל</button>
+    <button id="check-now" class="ghost">🔔 בדיקה עכשיו</button>
+    <button id="logout" class="danger">🚪 יציאה</button>
+  </footer>
+
+  <script src="app.js" defer></script>
+</body>
+</html>
