@@ -18,25 +18,19 @@
   box-sizing: border-box;
 }
 
-html, body {
-  height: 100%;
-}
-
 body {
   margin: 0;
   font-family: 'Heebo', 'Assistant', sans-serif;
   background: var(--bg);
   color: var(--text);
-  display: flex;
-  flex-direction: column;
 }
 
 .app-shell {
-  display: grid;
-  grid-template-columns: 25% 1fr;
   gap: 1.5rem;
   width: min(1200px, 96vw);
-  margin: 1.5rem auto 6rem;
+  margin: 0 auto;
+  padding: 1.5rem;
+  box-sizing: border-box;
 }
 
 .sidebar {
@@ -248,24 +242,6 @@ button:active {
   font-size: 0.9rem;
 }
 
-.toolbar {
-  position: fixed;
-  bottom: 0;
-  right: 0;
-  left: 0;
-  display: flex;
-  justify-content: center;
-  gap: 1rem;
-  padding: 1rem;
-  background: rgba(255, 255, 255, 0.85);
-  backdrop-filter: blur(10px);
-  box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.08);
-}
-
-.toolbar button {
-  min-width: 160px;
-}
-
 .visually-hidden {
   position: absolute;
   width: 1px;
@@ -281,40 +257,6 @@ button:active {
 @media (max-width: 1024px) {
   .app-shell {
     width: min(100%, 94vw);
-  }
-}
-
-@media (max-width: 768px) {
-  .app-shell {
-    grid-template-columns: 1fr;
-    margin-bottom: 7.5rem;
-  }
-
-  .sidebar {
-    order: -1;
-  }
-
-  .sidebar-header {
-    flex-wrap: wrap;
-    gap: 0.5rem;
-  }
-
-  .item-list li {
-    padding: 0.9rem 1.1rem;
-  }
-
-  .main-header {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .toolbar {
-    flex-wrap: wrap;
-  }
-
-  .toolbar button {
-    flex: 1 1 45%;
-    min-width: auto;
   }
 }
 
@@ -360,57 +302,46 @@ button:active {
   color: var(--text);
 }
 
-/* User screen */
-#user-screen[hidden] { display: none; }
+/* מצב משתמש: מציג רק מסך משתמש, מסתיר ניהול */
+#user-screen { display: none; }
+.user-mode .app-shell { display: none !important; }
+.user-mode #user-screen { display: block !important; }
+
+/* עיצוב בסיס למסך המשתמש */
 .user-header {
   display: flex; justify-content: space-between; align-items: center;
   padding: 12px 8px;
 }
 .hint { opacity: .75; font-size: .9rem; padding: 8px; }
 
-
-/* בסיס גובה וגלילה */
+/* גלילה ופריסה יציבים במובייל/דסקטופ */
 html, body { height: 100%; }
 body { overflow: hidden; }
 
-/* מיכל ראשי בגובה מסך יציב */
 .app-shell {
   display: grid;
   grid-template-columns: 280px 1fr;
   grid-template-rows: 1fr;
-  height: 100svh; /* יציב במובייל */
+  height: 100svh;       /* יציב מול פס הכתובת במובייל */
   min-height: 100svh;
 }
 
-/* אזורי גלילה פנימיים */
-.sidebar {
-  overflow: auto;
-  -webkit-overflow-scrolling: touch;
-}
-.main {
+.sidebar, .main {
   overflow: auto;
   -webkit-overflow-scrolling: touch;
 }
 
-/* סרגל תחתון נשאר מוצמד לתחתית */
-.toolbar {
-  position: sticky;
-  bottom: 0;
-}
-
-/* מובייל: sidebar הופך לבלוק עליון נמוך, main תופס את הגובה והגלילה */
+/* מובייל: sidebar למעלה, main מתחת עם גלילה */
 @media (max-width: 768px) {
   .app-shell {
     grid-template-columns: 1fr;
     grid-template-rows: auto 1fr;
   }
   .sidebar {
-    max-height: 40vh;      /* מספיק לרשימת אנשים + טופס קצר */
+    max-height: 40vh;
     border-bottom: 1px solid #e5e7eb;
-    border-left: none;
+    border-left: none !important;
   }
-  .main {
-    min-height: 0;         /* חשוב כדי ש-overflow יעבוד נכון ב-grid */
-  }
+  .main { min-height: 0; }
 }
 
