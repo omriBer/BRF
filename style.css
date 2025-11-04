@@ -254,11 +254,6 @@ button:active {
   border: 0;
 }
 
-@media (max-width: 1024px) {
-  .app-shell {
-    width: min(100%, 94vw);
-  }
-}
 
 .toast {
   position: fixed;
@@ -338,19 +333,6 @@ body { overflow: hidden; }
   -webkit-overflow-scrolling: touch;
 }
 
-/* מובייל: sidebar למעלה, main מתחת עם גלילה */
-@media (max-width: 768px) {
-  .app-shell {
-    grid-template-columns: 1fr;
-    grid-template-rows: auto 1fr;
-  }
-  .sidebar {
-    max-height: 40vh;
-    border-bottom: 1px solid #e5e7eb;
-    border-left: none !important;
-  }
-  .main { min-height: 0; }
-}
 
 .mode-nav{
   display:flex;
@@ -502,24 +484,52 @@ body { overflow: hidden; }
 .badge-soon { background: #e9fbf8; color: #0f766e; border-color: #ccf3ec; }
 .badge-late { background: #ffe9e9; color: #b42318; border-color: #ffd4d4; }
 
-/* === התאמות מובייל/רוחב צר ===
-   כאן נאפשר שבירת שורות בתוך הצ’יפ כדי להימנע מחיתוכים אגרסיביים */
+/* ===== מובייל/טבלט: גלילה תקינה במסך הניהול ===== */
 @media (max-width: 1024px) {
-  .chip {
-    white-space: normal;     /* מרשה ירידה לשורה הבאה */
-    flex-wrap: wrap;         /* מאפשר עטיפה בתוך הצ’יפ */
-    row-gap: 4px;
+  /* הדף עצמו יחזור לגלול במובייל */
+  body {
+    overflow: auto;
   }
-  .chip .time { order: 1; }
-  .chip .kid  { order: 2; }
-  .chip .title{ order: 3; flex-basis: 100%; } /* הכותרת תרד שורה אם צריך */
-  .chip .badge{ order: 4; }
-}
 
-@media (max-width: 640px){
-  .days, .rows { width: 980px; }
-  #admin-screen .app-shell { height: auto; min-height: auto; }
-  #week-screen { height: auto; }
+  /* פריסת מובייל: סיידבר למעלה, מיין מתחת; הגדרה מפורשת לגובה דינמי */
+  .app-shell {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto 1fr;
+    height: 100dvh;         /* דינמי, מתאים ל-iOS/Android */
+    min-height: 100dvh;
+  }
+
+  /* מרחב הניהול מתחת לניווט + next-up: לא ננעל בגובה קבוע */
+  #admin-screen .app-shell {
+    height: auto;           /* מבטל calc(...) מהדסקטופ */
+    min-height: auto;
+  }
+
+  /* הסיידבר לא יגנוב את כל המסך; גלילה פנימית כשצריך */
+  .sidebar {
+    max-height: 38dvh;              /* אפשר להתאים לפי טעם: 35–45dvh */
+    overflow: auto;
+    -webkit-overflow-scrolling: touch;
+    border-bottom: 1px solid #e5e7eb;
+  }
+
+  /* אזור התוכן (כולל כרטיס הטופס) מקבל גלילה פנימית חלקה */
+  .main {
+    min-height: 0;                   /* חשוב כדי ש-flex/grid ירשו גובה */
+    height: auto;
+    overflow: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* אם יש כותרות sticky מעל — זה עוזר "להצמד" נכון כשקופצים לעוגן */
+  .card {
+    scroll-margin-top: 88px;         /* מרחק מהניווט/next-up */
+  }
+
+  /* הימנע מזום אוטומטי ב-iOS בשדות (רק אם לא מוגדר כבר) */
+  input, select, textarea {
+    font-size: 16px;
+  }
 }
 
 .item-list li .ghost-link {
