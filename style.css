@@ -425,6 +425,7 @@ body { overflow: hidden; }
   color: #475569;
   font-weight: 600;
 }
+/* === WEEK BOARD CELLS === */
 .slot {
   min-height: 100px;
   padding: 10px;
@@ -435,7 +436,12 @@ body { overflow: hidden; }
   gap: 8px;
   align-content: flex-start;
   background: #fff;
+
+  /* חשוב: מונע גלישה ויזואלית של הצ’יפ מעבר לגבולות התא */
+  position: relative;
+  overflow: hidden;
 }
+
 .chip {
   display: inline-flex;
   align-items: center;
@@ -447,33 +453,41 @@ body { overflow: hidden; }
   font-size: 13px;
   color: #334155;
   box-shadow: 0 1px 0 rgba(0, 0, 0, 0.02);
+
+  /* חשוב: לא לאפשר ל-chip לחרוג מרוחב התא */
+  max-width: 100%;
+  min-width: 0;
+
+  /* ברירת מחדל: שורה אחת עם קיטום, כדי לא לפרוץ עמודות */
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.chip .time {
-  font-weight: 700;
-  color: #111827;
+
+.chip .time { font-weight: 700; color: #111827; flex: 0 0 auto; }
+.chip .kid  { font-weight: 700; flex: 0 0 auto; }
+
+/* הכותרת היא הגורם האלסטי: תתקצר קודם */
+.chip .title {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
-.chip .kid {
-  font-weight: 700;
-}
-.pin {
-  position: relative;
-  padding-inline-start: 14px;
-}
+
+/* נקודת סימון (אם קיימת אצלך) */
+.pin { position: relative; padding-inline-start: 14px; }
 .pin::before {
   content: "";
   position: absolute;
   inset-inline-start: 0;
   top: 50%;
   transform: translateY(-50%);
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
+  width: 8px; height: 8px; border-radius: 50%;
   background: currentColor;
-  box-shadow: 0 0 0 4px rgba(0, 0, 0, 0.04);
+  box-shadow: 0 0 0 4px rgba(0,0,0,0.04);
 }
+
 .badge {
   margin-inline-start: 4px;
   background: #eef2ff;
@@ -483,16 +497,23 @@ body { overflow: hidden; }
   border-radius: 999px;
   font-size: 11px;
   font-weight: 700;
+  flex: 0 0 auto;
 }
-.badge-soon {
-  background: #e9fbf8;
-  color: #0f766e;
-  border-color: #ccf3ec;
-}
-.badge-late {
-  background: #ffe9e9;
-  color: #b42318;
-  border-color: #ffd4d4;
+.badge-soon { background: #e9fbf8; color: #0f766e; border-color: #ccf3ec; }
+.badge-late { background: #ffe9e9; color: #b42318; border-color: #ffd4d4; }
+
+/* === התאמות מובייל/רוחב צר ===
+   כאן נאפשר שבירת שורות בתוך הצ’יפ כדי להימנע מחיתוכים אגרסיביים */
+@media (max-width: 1024px) {
+  .chip {
+    white-space: normal;     /* מרשה ירידה לשורה הבאה */
+    flex-wrap: wrap;         /* מאפשר עטיפה בתוך הצ’יפ */
+    row-gap: 4px;
+  }
+  .chip .time { order: 1; }
+  .chip .kid  { order: 2; }
+  .chip .title{ order: 3; flex-basis: 100%; } /* הכותרת תרד שורה אם צריך */
+  .chip .badge{ order: 4; }
 }
 
 @media (max-width: 640px){
