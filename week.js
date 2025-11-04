@@ -6,7 +6,7 @@ let tasks = [];
 const windows = [
   { key: "morning",  label: "בוקר (06:00–12:00)",   start: 6,  end: 12 },
   { key: "noon",     label: "צהריים (12:00–16:00)", start: 12, end: 16 },
-  { key: "afternoon",label: "אחה"צ (16:00–19:00)",  start: 16, end: 19 },
+  { key: "afternoon",label: "אחהצ (16:00–19:00)",  start: 16, end: 19 },
   { key: "evening",  label: "ערב (19:00–23:00)",    start: 19, end: 23 },
 ];
 
