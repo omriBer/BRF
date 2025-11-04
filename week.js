@@ -15,55 +15,49 @@ const HOUR_SLOTS = [
 ];
 const dayNames = ["א", "ב", "ג", "ד", "ה", "ו", "ש"];
 
+let PEOPLE_CACHE = {};
+let TASKS_CACHE = [];
+
+// ---------- utils ----------
 function parseISO(d) {
   if (!d) return null;
-  const value = typeof d.toDate === "function" ? d.toDate() : d;
-  const x = new Date(value);
+  const v = typeof d.toDate === "function" ? d.toDate() : d;
+  const x = new Date(v);
   return Number.isFinite(x.getTime()) ? x : null;
 }
 function toLocalHM(d) {
-  return d.toLocaleTimeString("he-IL", {
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false
-  });
+  return d.toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit", hour12: false });
 }
-function getWeekday(d) {
-  return d.getDay();
-}
+function getWeekday(d) { return d.getDay(); }
 function timeToHours(time) {
   const [hh, mm] = (time || "").split(":").map((n) => +n || 0);
   return hh + mm / 60;
 }
-function dateToHours(d) {
-  return d.getHours() + d.getMinutes() / 60;
-}
+function dateToHours(d) { return d.getHours() + d.getMinutes() / 60; }
 function bucketForHour(h) {
   const slot = HOUR_SLOTS.find((s) => h >= s.range[0] && h < s.range[1]);
   return slot?.key ?? null;
 }
 function hashColor(str) {
   let h = 0;
-  for (let i = 0; i < str.length; i += 1) {
-    h = (h * 31 + str.charCodeAt(i)) >>> 0;
-  }
-  const palette = ["#6c8bff", "#22b8a9", "#ff8a6c", "#b46cff", "#ffb347", "#33c3ff", "#8fc93a"];
-  return palette[h % palette.length];
+  for (let i = 0; i < str.length; i += 1) h = (h * 31 + str.charCodeAt(i)) >>> 0;
+  const pal = ["#6c8bff", "#22b8a9", "#ff8a6c", "#b46cff", "#ffb347", "#33c3ff", "#8fc93a"];
+  return pal[h % pal.length];
 }
 
-async function loadData() {
-  const people = {};
-  (await getDocs(query(collection(db, "people")))).forEach((docSnap) => {
-    const person = { id: docSnap.id, ...docSnap.data() };
-    people[person.id] = person;
-  });
+// ---------- data ----------
+async function loadPeopleOnce() {
+  const snap = await getDocs(query(collection(db, "people")));
+  const res = {};
+  snap.forEach((doc) => { res[doc.id] = { id: doc.id, ...doc.data() }; });
+  PEOPLE_CACHE = res;
+}
+async function loadTasksOnce() {
+  const snap = await getDocs(query(collection(db, "tasks")));
   const tasks = [];
-  (await getDocs(query(collection(db, "tasks")))).forEach((docSnap) => {
-    tasks.push({ id: docSnap.id, ...docSnap.data() });
-  });
-  return { people, tasks };
+  snap.forEach((doc) => tasks.push({ id: doc.id, ...doc.data() }));
+  TASKS_CACHE = tasks;
 }
-
 function buildWeek({ people, tasks }) {
   const week = Array.from({ length: 7 }, () => ({ morning: [], noon: [], eveningA: [], night: [] }));
   const now = new Date();
@@ -122,7 +116,6 @@ function buildWeek({ people, tasks }) {
   }
   return week;
 }
-
 function renderWeek(week) {
   const days = document.querySelector("#week-screen .days");
   const rows = document.querySelector("#week-screen .rows");
@@ -140,7 +133,7 @@ function renderWeek(week) {
     for (let day = 0; day < 7; day += 1) {
       const cell = document.createElement("div");
       cell.className = "slot";
-      week[day][slot.key].forEach((item) => {
+      (week[day][slot.key] || []).forEach((item) => {
         const chip = document.createElement("span");
         chip.className = "chip";
         chip.innerHTML = `
@@ -158,15 +151,21 @@ function renderWeek(week) {
   });
 }
 
-async function initWeek() {
-  const data = await loadData();
-  const model = buildWeek(data);
-  renderWeek(model);
+// ---------- init ----------
+export async function initWeek() {
+  // טעינת התחלתית
+  await Promise.all([loadPeopleOnce(), loadTasksOnce()]);
+  renderWeek(buildWeek({ people: PEOPLE_CACHE, tasks: TASKS_CACHE }));
+
+  // live updates: tasks
   onSnapshot(query(collection(db, "tasks"), orderBy("datetime", "asc")), async () => {
-    const fresh = await loadData();
-    const next = buildWeek(fresh);
-    renderWeek(next);
+    await loadTasksOnce();
+    renderWeek(buildWeek({ people: PEOPLE_CACHE, tasks: TASKS_CACHE }));
+  });
+
+  // live updates: people
+  onSnapshot(query(collection(db, "people")), async () => {
+    await loadPeopleOnce();
+    renderWeek(buildWeek({ people: PEOPLE_CACHE, tasks: TASKS_CACHE }));
   });
 }
-
-export { initWeek };
