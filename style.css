@@ -835,3 +835,36 @@ body[data-mode="week"] #week-screen .chip {
   --nextup-category-bg: #ffd7d7;
   --nextup-category-text: #7f1d1d;
 }
+
+
+/* === WEEK BOARD SCROLL — HARD OVERRIDES (DO NOT TOUCH OTHER SCREENS) === */
+body[data-mode="week"] {
+  /* הגוף לא גולל; מחלק רשת לשתי שורות: הטאבים + מסך השבוע */
+  overflow: hidden !important;
+  height: 100dvh;
+  display: grid;
+  grid-template-rows: auto 1fr;
+}
+
+body[data-mode="week"] #week-screen {
+  /* ממלא את השורה השנייה ברשת; אין גלילה כאן */
+  min-height: 0 !important;
+  height: 100%;
+  overflow: hidden !important;
+  display: flex;
+  flex-direction: column;
+}
+
+body[data-mode="week"] #week-screen .board {
+  /*   */
+  flex: 1 1 auto;
+  height: 100% !important;
+  min-height: 0 !important;
+  overflow: auto !important;             /* גם x וגם y */
+  -webkit-overflow-scrolling: touch;     /* iOS */
+  overscroll-behavior: contain;
+  scroll-behavior: smooth;
+  /* מבטיח גלילה אופקית כשצרים */
+  min-width: 980px;
+}
+
