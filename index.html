@@ -18,7 +18,14 @@
   </script>
 </head>
 <body>
-  <div class="app-shell">
+  <!-- NAV מצבים -->
+  <nav class="mode-nav" aria-label="מצבי תצוגה">
+    <button data-mode="admin" class="active">ניהול</button>
+    <button data-mode="week">שבוע משפחתי</button>
+  </nav>
+
+  <section id="admin-screen">
+    <div class="app-shell">
     <aside class="sidebar" aria-label="אנשים במשפחה">
       <div class="sidebar-header">
         <h2>👪 אנשים במשפחה</h2>
@@ -89,7 +96,15 @@
         <ul id="task-list" class="item-list tasks"></ul>
       </section>
     </main>
-  </div>
+    </div>
+  </section>
+
+  <section id="week-screen" hidden aria-label="שבוע משפחתי">
+    <div class="board">
+      <div class="days"></div>
+      <div class="rows"></div>
+    </div>
+  </section>
 
   <!-- מסך משתמש (קריאה בלבד) -->
   <section id="user-screen" aria-label="משימות שלי">
@@ -111,8 +126,47 @@
     </p>
   </section>
 
+  <script type="module" src="firebase.js"></script>
+  <script type="module">
+    import { initWeek } from './week.js';
+
+    const nav = document.querySelector('.mode-nav');
+    const admin = document.getElementById('admin-screen');
+    const week = document.getElementById('week-screen');
+    let weekInited = false;
+
+    if (!nav || document.documentElement.classList.contains('user-mode')) {
+      if (nav) {
+        nav.hidden = true;
+      }
+    } else {
+      function setMode(mode) {
+        nav.querySelectorAll('button').forEach((b) => b.classList.toggle('active', b.dataset.mode === mode));
+        const adminOn = mode === 'admin';
+        admin.hidden = !adminOn;
+        week.hidden = adminOn;
+        if (!adminOn && !weekInited) {
+          weekInited = true;
+          initWeek();
+        }
+        try {
+          history.replaceState(null, '', `#mode=${mode}`);
+        } catch (e) {
+          console.warn('cannot update history', e);
+        }
+      }
+
+      nav.addEventListener('click', (ev) => {
+        const btn = ev.target.closest('button[data-mode]');
+        if (!btn) return;
+        setMode(btn.dataset.mode);
+      });
+
+      const initial = (location.hash || '').includes('week') ? 'week' : 'admin';
+      setMode(initial);
+    }
+  </script>
   <script type="module" src="./app.js"></script>
-  <script type="module" src="./firebase.js"></script>
 
 </body>
 </html>

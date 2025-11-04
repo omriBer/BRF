@@ -201,6 +201,21 @@ function renderPeople() {
     const actions = document.createElement("div");
     actions.className = "actions";
 
+    const childHref = `/child.html?user=${encodeURIComponent(person.id)}`;
+    const childLink = document.createElement("a");
+    childLink.className = "ghost ghost-link";
+    childLink.href = childHref;
+    childLink.target = "_blank";
+    childLink.rel = "noopener";
+    childLink.textContent = "קישור ילד";
+
+    const copyBtn = document.createElement("button");
+    copyBtn.className = "ghost";
+    copyBtn.type = "button";
+    copyBtn.textContent = "📋";
+    copyBtn.title = "העתק קישור ילד";
+    copyBtn.addEventListener("click", () => copyChildLink(person.id));
+
     const editBtn = document.createElement("button");
     editBtn.className = "ghost";
     editBtn.type = "button";
@@ -212,15 +227,7 @@ function renderPeople() {
     deleteBtn.type = "button";
     deleteBtn.textContent = "🗑️";
     deleteBtn.addEventListener("click", () => deletePerson(person.id));
-
-    const linkBtn = document.createElement("button");
-    linkBtn.className = "ghost";
-    linkBtn.type = "button";
-    linkBtn.textContent = "🔗";
-    linkBtn.title = "קישור למסך המשתמש";
-    linkBtn.addEventListener("click", () => copyInstallLink(person.id));
-
-    actions.append(editBtn, deleteBtn, linkBtn);
+    actions.append(childLink, copyBtn, editBtn, deleteBtn);
     li.append(nameSpan, actions);
     peopleListEl.append(li);
   });
@@ -609,14 +616,19 @@ function computeNextOccurrence(date, recurring, now) {
   return result;
 }
 
-function copyInstallLink(personId) {
-  const url = `${location.origin}${location.pathname}?user=${encodeURIComponent(personId)}`;
-  navigator.clipboard?.writeText(url).then(
-    () => showToast("קישור הועתק"),
-    () => {
-      prompt("העתק קישור התקנה:", url);
-    }
-  );
+function copyChildLink(personId) {
+  const url = `${location.origin}/child.html?user=${encodeURIComponent(personId)}`;
+  const write = navigator.clipboard?.writeText;
+  if (write) {
+    write.call(navigator.clipboard, url).then(
+      () => showToast("קישור ילד הועתק"),
+      () => {
+        prompt("העתק קישור ילד:", url);
+      }
+    );
+  } else {
+    prompt("העתק קישור ילד:", url);
+  }
 }
 
 function ensureNotificationPermission() {
