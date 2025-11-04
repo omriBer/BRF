@@ -485,8 +485,7 @@ async function editTask(taskId) {
 
   let chosenPersonId = task.personId;
   if (data.people.length) {
-    const personMap = data.people.map((p, i) => `${i + 1}. ${p.name}`).join("
-");
+    const personMap = data.people.map((p, i) => `${i + 1}. ${p.name}`).join("\n");
     const personChoice = prompt(`בחרו אדם למשימה:
 ${personMap}`, String(data.people.findIndex((p) => p.id === task.personId) + 1));
     const personIndex = Number(personChoice) - 1;
