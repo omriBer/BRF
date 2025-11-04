@@ -158,6 +158,10 @@
         const adminOn = mode === 'admin';
         admin.hidden = !adminOn;
         week.hidden = adminOn;
+
+        /* :   -CSS */
+        document.body.dataset.mode = mode;
+
         if (!adminOn && !weekInited) {
           weekInited = true;
           initWeek();
