@@ -207,7 +207,7 @@ function renderPeople() {
     const actions = document.createElement("div");
     actions.className = "actions";
 
-    const childHref = `/child.html?user=${encodeURIComponent(person.id)}`;
+    const childHref = `/BRF/child.html?user=${encodeURIComponent(person.id)}`;
     const childLink = document.createElement("a");
     childLink.className = "ghost ghost-link";
     childLink.href = childHref;
