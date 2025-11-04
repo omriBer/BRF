@@ -52,7 +52,7 @@
       </header>
 
       <section class="card" aria-labelledby="task-form-title">
-        <h2 id="task-form-title">➕ הוספת משימה</h2>
+        <h2 id="task-form-title">הוספת משימה</h2>
         <form id="task-form" autocomplete="off">
           <div class="form-grid">
             <label>
@@ -81,6 +81,19 @@
                 <option value="none">ללא</option>
                 <option value="daily">יומי</option>
                 <option value="weekly">שבועי</option>
+              </select>
+            </label>
+
+            <!-- חדש: סוג אירוע / קטגוריה -->
+            <label>
+              סוג אירוע
+              <select name="category">
+                <option value="">ללא</option>
+                <option value="weekly_club">חוג שבועי</option>
+                <option value="birthday">יום הולדת</option>
+                <option value="school">פעילות בית ספר</option>
+                <option value="family">פעילות משפחה</option>
+                <option value="important">אירוע חשוב</option>
               </select>
             </label>
           </div>

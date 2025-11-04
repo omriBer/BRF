@@ -548,3 +548,60 @@ body { overflow: hidden; }
   background: rgba(25, 118, 210, 0.1);
 }
 
+
+/* ===== Categories palette ===== */
+:root{
+  --cat-weekly_club-bg: #eef2ff;
+  --cat-weekly_club-bd: #dfe6ff;
+  --cat-weekly_club-tx: #4f46e5;
+
+  --cat-birthday-bg: #fff5e6;
+  --cat-birthday-bd: #ffe8c7;
+  --cat-birthday-tx: #b45309;
+
+  --cat-school-bg: #e6f7ff;
+  --cat-school-bd: #cfeeff;
+  --cat-school-tx: #075985;
+
+  --cat-family-bg: #e9fbf8;
+  --cat-family-bd: #ccf3ec;
+  --cat-family-tx: #0f766e;
+
+  --cat-important-bg: #ffe9e9;
+  --cat-important-bd: #ffd4d4;
+  --cat-important-tx: #b42318;
+}
+
+/* chip בגריד השבועי לפי data-cat או מחלקה */
+.chip[data-cat="weekly_club"], .chip.cat-weekly_club{
+  background: var(--cat-weekly_club-bg);
+  border-color: var(--cat-weekly_club-bd);
+  color: var(--cat-weekly_club-tx);
+}
+.chip[data-cat="birthday"], .chip.cat-birthday{
+  background: var(--cat-birthday-bg);
+  border-color: var(--cat-birthday-bd);
+  color: var(--cat-birthday-tx);
+}
+.chip[data-cat="school"], .chip.cat-school{
+  background: var(--cat-school-bg);
+  border-color: var(--cat-school-bd);
+  color: var(--cat-school-tx);
+}
+.chip[data-cat="family"], .chip.cat-family{
+  background: var(--cat-family-bg);
+  border-color: var(--cat-family-bd);
+  color: var(--cat-family-tx);
+}
+.chip[data-cat="important"], .chip.cat-important{
+  background: var(--cat-important-bg);
+  border-color: var(--cat-important-bd);
+  color: var(--cat-important-tx);
+}
+
+/* Next-up pills */
+.nextup-item[data-cat="weekly_club"] { border-color: var(--cat-weekly_club-bd); color: var(--cat-weekly_club-tx); }
+.nextup-item[data-cat="birthday"]    { border-color: var(--cat-birthday-bd);    color: var(--cat-birthday-tx); }
+.nextup-item[data-cat="school"]      { border-color: var(--cat-school-bd);      color: var(--cat-school-tx); }
+.nextup-item[data-cat="family"]      { border-color: var(--cat-family-bd);      color: var(--cat-family-tx); }
+.nextup-item[data-cat="important"]   { border-color: var(--cat-important-bd);   color: var(--cat-important-tx); }

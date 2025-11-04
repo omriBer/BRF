@@ -1,171 +1,154 @@
-import { db } from "./firebase.js";
-import {
-  collection,
-  getDocs,
-  onSnapshot,
-  query,
-  orderBy
-} from "https://www.gstatic.com/firebasejs/12.5.0/firebase-firestore.js";
+import { PeopleAPI, TasksAPI } from "./firebase.js";
 
-const HOUR_SLOTS = [
-  { key: "morning", label: "בוקר (06:00–11:59)", range: [6, 12] },
-  { key: "noon", label: "צהריים (12:00–15:59)", range: [12, 16] },
-  { key: "eveningA", label: "אחה״צ (16:00–18:59)", range: [16, 19] },
-  { key: "night", label: "ערב (19:00–23:00)", range: [19, 24] }
+let people = [];
+let tasks = [];
+
+const windows = [
+  { key: "morning",  label: "בוקר (06:00–12:00)",   start: 6,  end: 12 },
+  { key: "noon",     label: "צהריים (12:00–16:00)", start: 12, end: 16 },
+  { key: "afternoon",label: "אחה"צ (16:00–19:00)",  start: 16, end: 19 },
+  { key: "evening",  label: "ערב (19:00–23:00)",    start: 19, end: 23 },
 ];
-const dayNames = ["א", "ב", "ג", "ד", "ה", "ו", "ש"];
 
-let PEOPLE_CACHE = {};
-let TASKS_CACHE = [];
-
-// ---------- utils ----------
-function parseISO(d) {
-  if (!d) return null;
-  const v = typeof d.toDate === "function" ? d.toDate() : d;
-  const x = new Date(v);
-  return Number.isFinite(x.getTime()) ? x : null;
-}
-function toLocalHM(d) {
-  return d.toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit", hour12: false });
-}
-function getWeekday(d) { return d.getDay(); }
-function timeToHours(time) {
-  const [hh, mm] = (time || "").split(":").map((n) => +n || 0);
-  return hh + mm / 60;
-}
-function dateToHours(d) { return d.getHours() + d.getMinutes() / 60; }
-function bucketForHour(h) {
-  const slot = HOUR_SLOTS.find((s) => h >= s.range[0] && h < s.range[1]);
-  return slot?.key ?? null;
-}
-function hashColor(str) {
-  let h = 0;
-  for (let i = 0; i < str.length; i += 1) h = (h * 31 + str.charCodeAt(i)) >>> 0;
-  const pal = ["#6c8bff", "#22b8a9", "#ff8a6c", "#b46cff", "#ffb347", "#33c3ff", "#8fc93a"];
-  return pal[h % pal.length];
-}
-
-// ---------- data ----------
-async function loadPeopleOnce() {
-  const snap = await getDocs(query(collection(db, "people")));
-  const res = {};
-  snap.forEach((doc) => { res[doc.id] = { id: doc.id, ...doc.data() }; });
-  PEOPLE_CACHE = res;
-}
-async function loadTasksOnce() {
-  const snap = await getDocs(query(collection(db, "tasks")));
-  const tasks = [];
-  snap.forEach((doc) => tasks.push({ id: doc.id, ...doc.data() }));
-  TASKS_CACHE = tasks;
-}
-function buildWeek({ people, tasks }) {
-  const week = Array.from({ length: 7 }, () => ({ morning: [], noon: [], eveningA: [], night: [] }));
-  const now = new Date();
-
-  tasks.forEach((task) => {
-    const person = people[task.personId] || { name: "לא ידוע" };
-    const color = person.color || hashColor(task.personId || "X");
-
-    if (task.type === "recurring" || task.recurring === "weekly") {
-      let { weekday, time } = task;
-      weekday = weekday != null ? Number(weekday) : weekday;
-      if (weekday == null || !time) {
-        const d = parseISO(task.datetime);
-        if (!d) return;
-        weekday = getWeekday(d);
-        time = toLocalHM(d);
-      }
-      if (!Number.isInteger(weekday) || weekday < 0 || weekday > 6) return;
-      const h = timeToHours(time);
-      const bucket = bucketForHour(h);
-      if (!bucket) return;
-      week[weekday][bucket].push({
-        time,
-        title: task.title || "",
-        kid: person.name || "",
-        badge: task.category || "חוג שבועי",
-        color
-      });
-    } else {
-      const d = parseISO(task.datetime);
-      if (!d) return;
-      const h = dateToHours(d);
-      const bucket = bucketForHour(h);
-      if (!bucket) return;
-      const diffMin = (d - now) / 60000;
-      const soon = diffMin >= 0 && diffMin <= Math.max(Number(task.reminderBefore || 0), 60);
-      const late = diffMin < -10;
-      const weekday = getWeekday(d);
-      if (weekday < 0 || weekday > 6) return;
-      week[weekday][bucket].push({
-        time: toLocalHM(d),
-        title: task.title || "",
-        kid: person.name || "",
-        badge: task.category || "",
-        color,
-        soon,
-        late
-      });
+export function initWeek(){
+  PeopleAPI.onSnapshot((arr)=>{ people = arr; draw(); });
+  TasksAPI.onSnapshot((arr)=>{
+    tasks = arr.map((t)=>{
+      const o = { ...t };
+      if (o.datetime?.toDate) o.datetime = o.datetime.toDate().toISOString();
+      o.category = (o.category || "").trim();
+      return o;
+    });
+    draw();
+  });
+  document.addEventListener("brf:data", (ev)=>{
+    if (ev?.detail) {
+      people = ev.detail.people || people;
+      tasks  = (ev.detail.tasks || []).map(t => ({...t, category: (t.category||"").trim()}));
+      draw();
     }
+  }, { passive: true });
+  draw();
+}
+
+function startOfWeek(d){
+  const dt = new Date(d);
+  const day = dt.getDay();
+  const diff = day; // Sunday as start
+  dt.setHours(0,0,0,0);
+  dt.setDate(dt.getDate() - diff);
+  return dt;
+}
+function addDays(d, n){ const x = new Date(d); x.setDate(x.getDate() + n); return x; }
+function sameDay(a,b){ return a.getFullYear()===b.getFullYear() && a.getMonth()===b.getMonth() && a.getDate()===b.getDate(); }
+function inWindow(date, w){ const h = date.getHours() + date.getMinutes()/60; return h >= w.start && h < w.end; }
+function toHM(d){ return new Intl.DateTimeFormat("he-IL",{hour:'2-digit',minute:'2-digit',hour12:false}).format(d); }
+
+function draw(){
+  const daysEl = document.querySelector("#week-screen .days");
+  const rowsEl = document.querySelector("#week-screen .rows");
+  if(!daysEl || !rowsEl) return;
+
+  daysEl.innerHTML = "";
+  const headLabel = document.createElement("div");
+  headLabel.className = "cell-day";
+  headLabel.textContent = "חלונות זמן";
+  daysEl.append(headLabel);
+
+  const today = new Date();
+  const weekStart = startOfWeek(today);
+  const days = Array.from({length:7}, (_,i)=> addDays(weekStart, i));
+
+  const weekdayFmt = new Intl.DateTimeFormat("he-IL", { weekday: 'short', day: '2-digit', month: '2-digit' });
+  days.forEach((d)=>{
+    const c = document.createElement("div");
+    c.className = "cell-day";
+    c.textContent = weekdayFmt.format(d);
+    daysEl.append(c);
   });
 
-  for (let day = 0; day < 7; day += 1) {
-    Object.keys(week[day]).forEach((key) => {
-      week[day][key].sort((a, b) => a.time.localeCompare(b.time, "he-IL", { numeric: true }));
-    });
-  }
-  return week;
-}
-function renderWeek(week) {
-  const days = document.querySelector("#week-screen .days");
-  const rows = document.querySelector("#week-screen .rows");
-  if (!days || !rows) return;
-
-  days.innerHTML = `<div class="cell-day">חלון זמן</div>${dayNames.map((n) => `<div class="cell-day">${n}</div>`).join("")}`;
-  rows.innerHTML = "";
-
-  HOUR_SLOTS.forEach((slot) => {
+  rowsEl.innerHTML = "";
+  windows.forEach((w)=>{
     const label = document.createElement("div");
     label.className = "row-label";
-    label.textContent = slot.label;
-    rows.append(label);
+    label.textContent = w.label;
+    rowsEl.append(label);
 
-    for (let day = 0; day < 7; day += 1) {
-      const cell = document.createElement("div");
-      cell.className = "slot";
-      (week[day][slot.key] || []).forEach((item) => {
-        const chip = document.createElement("span");
-        chip.className = "chip";
-        chip.innerHTML = `
-          <span class="time">${item.time}</span>
-          <span class="pin" style="color:${item.color}"></span>
-          <span class="kid">${item.kid}</span> – ${item.title}
-          ${item.badge ? `<span class="badge">${item.badge}</span>` : ""}
-          ${item.soon ? '<span class="badge badge-soon">עוד מעט</span>' : ""}
-          ${item.late ? '<span class="badge badge-late">עבר הזמן</span>' : ""}
-        `;
-        cell.append(chip);
+    days.forEach((d)=>{
+      const slot = document.createElement("div");
+      slot.className = "slot";
+      rowsEl.append(slot);
+
+      const items = tasks
+        .filter(t => t?.datetime)
+        .map(t => ({...t, dateObj: new Date(t.datetime)}))
+        .filter(t => sameDay(t.dateObj, d) && inWindow(t.dateObj, w))
+        .sort((a,b)=> a.dateObj - b.dateObj);
+
+      items.forEach((t)=>{
+        const kid = people.find(p => p.id === t.personId);
+        const chip = document.createElement("div");
+        chip.className = "chip pin";
+
+        // קבע קטגוריה (weekly_club אוטומטי אם recurring=weekly ואין category)
+        const cat = (t.category || (t.recurring === "weekly" ? "weekly_club" : "")).trim();
+        if (cat) chip.dataset.cat = cat; // מאפשר צביעה דרך CSS
+
+        // קו צבעוני לפי ילד (כמו קודם) – נשמר כ-decoration משני
+        chip.style.color = personColor(kid?.id || "");
+
+        const time = document.createElement("span");
+        time.className = "time";
+        time.textContent = toHM(t.dateObj);
+
+        const kidEl = document.createElement("span");
+        kidEl.className = "kid";
+        kidEl.textContent = kid ? kid.name : "—";
+
+        const title = document.createElement("span");
+        title.className = "title";
+        title.textContent = t.title || "";
+
+        chip.append(time, kidEl, title);
+
+        // badge קטגוריה לטקסט
+        if (cat) {
+          const b = document.createElement("span");
+          b.className = "badge";
+          b.textContent = labelForCategory(cat);
+          chip.append(b);
+        }
+
+        // “קרוב/עבר” (אופציונלי)
+        const now = Date.now();
+        const delta = t.dateObj.getTime() - now;
+        if (Math.abs(delta) < 60*60*1000) {
+          const b2 = document.createElement("span");
+          b2.className = delta >= 0 ? "badge badge-soon" : "badge badge-late";
+          b2.textContent = delta >= 0 ? "קרוב" : "עבר לפני רגע";
+          chip.append(b2);
+        }
+        slot.append(chip);
       });
-      rows.append(cell);
-    }
+    });
   });
 }
 
-// ---------- init ----------
-export async function initWeek() {
-  // טעינת התחלתית
-  await Promise.all([loadPeopleOnce(), loadTasksOnce()]);
-  renderWeek(buildWeek({ people: PEOPLE_CACHE, tasks: TASKS_CACHE }));
+function labelForCategory(cat){
+  switch((cat||"").trim()){
+    case "weekly_club": return "חוג שבועי";
+    case "birthday":    return "יום הולדת";
+    case "school":      return "פעילות בית ספר";
+    case "family":      return "פעילות משפחה";
+    case "important":   return "אירוע חשוב";
+    default: return "";
+  }
+}
 
-  // live updates: tasks
-  onSnapshot(query(collection(db, "tasks"), orderBy("datetime", "asc")), async () => {
-    await loadTasksOnce();
-    renderWeek(buildWeek({ people: PEOPLE_CACHE, tasks: TASKS_CACHE }));
-  });
-
-  // live updates: people
-  onSnapshot(query(collection(db, "people")), async () => {
-    await loadPeopleOnce();
-    renderWeek(buildWeek({ people: PEOPLE_CACHE, tasks: TASKS_CACHE }));
-  });
+// Deterministic color per person id (secondary accent)
+function personColor(key){
+  let h = 0;
+  for (let i=0;i<key.length;i++){ h = (h*31 + key.charCodeAt(i)) & 0xffffffff; }
+  h = Math.abs(h) % 360;
+  return `hsl(${h} 60% 35%)`;
 }
