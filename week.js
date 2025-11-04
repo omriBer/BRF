@@ -90,12 +90,27 @@ function draw(){
         const chip = document.createElement("div");
         chip.className = "chip pin";
 
-        // קבע קטגוריה (weekly_club אוטומטי אם recurring=weekly ואין category)
-        const cat = (t.category || (t.recurring === "weekly" ? "weekly_club" : "")).trim();
-        if (cat) chip.dataset.cat = cat; // מאפשר צביעה דרך CSS
+        const cat = (t.category || "").trim();
+        if (cat) {
+          chip.dataset.cat = cat;
+        } else {
+          delete chip.dataset.cat;
+        }
 
-        // קו צבעוני לפי ילד (כמו קודם) – נשמר כ-decoration משני
-        chip.style.color = personColor(kid?.id || "");
+        const accent = personAccent(kid?.id || "");
+        if (!cat) {
+          chip.classList.add("no-category");
+          chip.style.setProperty("--chip-bg", accent.bg);
+          chip.style.setProperty("--chip-border", accent.border);
+          chip.style.setProperty("--chip-ring", accent.ring);
+          chip.style.setProperty("--chip-dot", accent.dot);
+        } else {
+          chip.classList.remove("no-category");
+          chip.style.removeProperty("--chip-bg");
+          chip.style.removeProperty("--chip-border");
+          chip.style.removeProperty("--chip-ring");
+          chip.style.removeProperty("--chip-dot");
+        }
 
         const time = document.createElement("span");
         time.className = "time";
@@ -141,14 +156,27 @@ function labelForCategory(cat){
     case "school":      return "פעילות בית ספר";
     case "family":      return "פעילות משפחה";
     case "important":   return "אירוע חשוב";
-    default: return "";
+    default: return (cat || "");
   }
 }
 
-// Deterministic color per person id (secondary accent)
-function personColor(key){
+// Deterministic accent palette per person id (secondary accent)
+function personAccent(key){
+  if (!key) {
+    return {
+      bg: "#f7f9fe",
+      border: "#e6ecfb",
+      ring: "rgba(0,0,0,0.04)",
+      dot: "#94a3b8"
+    };
+  }
   let h = 0;
   for (let i=0;i<key.length;i++){ h = (h*31 + key.charCodeAt(i)) & 0xffffffff; }
   h = Math.abs(h) % 360;
-  return `hsl(${h} 60% 35%)`;
+  return {
+    bg: `hsl(${h} 80% 95%)`,
+    border: `hsl(${h} 60% 82%)`,
+    ring: `hsl(${h} 85% 92%)`,
+    dot: `hsl(${h} 65% 45%)`
+  };
 }
