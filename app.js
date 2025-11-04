@@ -23,8 +23,8 @@ document.getElementById("enable-push")?.addEventListener("click", async () => {
     const urlParams = new URLSearchParams(location.search);
     const personId = urlParams.get("user") || null;
     const token = await window.initMessaging(personId);
-    if (token) alert("נרשמת לקבלת התראות ")
-(token בקונסול)");
+if (token) alert("נרשמת לקבלת התראות ✅\n(token בקונסול)");
+
   } else {
     alert("initMessaging לא נטענה — בדוק טעינת firebase.js");
   }
