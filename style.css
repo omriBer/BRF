@@ -484,52 +484,57 @@ body { overflow: hidden; }
 .badge-soon { background: #e9fbf8; color: #0f766e; border-color: #ccf3ec; }
 .badge-late { background: #ffe9e9; color: #b42318; border-color: #ffd4d4; }
 
-/* ===== מובייל/טבלט: גלילה תקינה במסך הניהול ===== */
+/* ===== מובייל/טאבלט: הפרדת גלילה בין מצבים ===== */
 @media (max-width: 1024px) {
-  /* הדף עצמו יחזור לגלול במובייל */
-  body {
-    overflow: auto;
+  /* === מצב ניהול === */
+  body[data-mode="admin"] {
+    overflow: auto; /* רק בניהול מחזירים גלילה לגוף הדף */
   }
 
-  /* פריסת מובייל: סיידבר למעלה, מיין מתחת; הגדרה מפורשת לגובה דינמי */
-  .app-shell {
+  body[data-mode="admin"] .app-shell {
     grid-template-columns: 1fr;
     grid-template-rows: auto 1fr;
-    height: 100dvh;         /* דינמי, מתאים ל-iOS/Android */
-    min-height: 100dvh;
+    height: auto;         /* לא נועלים גובה */
+    min-height: 100dvh;   /* שיהיה נעים עם מקלדת/סרגלים נייד */
   }
 
-  /* מרחב הניהול מתחת לניווט + next-up: לא ננעל בגובה קבוע */
-  #admin-screen .app-shell {
-    height: auto;           /* מבטל calc(...) מהדסקטופ */
-    min-height: auto;
-  }
-
-  /* הסיידבר לא יגנוב את כל המסך; גלילה פנימית כשצריך */
-  .sidebar {
-    max-height: 38dvh;              /* אפשר להתאים לפי טעם: 35–45dvh */
+  body[data-mode="admin"] .sidebar {
+    max-height: 38dvh;
     overflow: auto;
     -webkit-overflow-scrolling: touch;
     border-bottom: 1px solid #e5e7eb;
   }
 
-  /* אזור התוכן (כולל כרטיס הטופס) מקבל גלילה פנימית חלקה */
-  .main {
-    min-height: 0;                   /* חשוב כדי ש-flex/grid ירשו גובה */
+  body[data-mode="admin"] .main {
+    min-height: 0;        /* קריטי ב-grid/flex */
     height: auto;
     overflow: auto;
     -webkit-overflow-scrolling: touch;
   }
 
-  /* אם יש כותרות sticky מעל — זה עוזר "להצמד" נכון כשקופצים לעוגן */
-  .card {
-    scroll-margin-top: 88px;         /* מרחק מהניווט/next-up */
+  /* === מצב שבוע === */
+  body[data-mode="week"] {
+    overflow: hidden;      /* אין גלילה לדף עצמו, רק ללוח */
   }
 
-  /* הימנע מזום אוטומטי ב-iOS בשדות (רק אם לא מוגדר כבר) */
-  input, select, textarea {
-    font-size: 16px;
+  body[data-mode="week"] #week-screen {
+    display: block;
+    position: relative;
+    height: 100dvh;        /* תופס את כל הגובה */
+    overflow: hidden;      /* הגלילה תתרחש בתוך .board */
   }
+
+  body[data-mode="week"] #week-screen .board {
+    position: absolute;
+    inset: 0;              /* ממלא את המסך */
+    overflow: auto;        /* כאן מתבצעת הגלילה האנכית/האופקית */
+    -webkit-overflow-scrolling: touch;
+    min-width: 980px;      /* שומר טבלת 7 הימים במובייל; גלילה אופקית עדינה */
+  }
+
+  /* טיפ: גובה צפוי ל-Next-up במובייל */
+  .nextup-shell { --nextup-h: 56px; }
+  .nextup-shell { min-height: var(--nextup-h); }
 }
 
 .item-list li .ghost-link {
