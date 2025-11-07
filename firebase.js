@@ -163,6 +163,8 @@ export const TasksAPI = {
       datetime: task.datetime ? new Date(task.datetime) : null,
       reminderBefore: Number(task.reminderBefore || 0),
       recurring: task.recurring || "none",
+      category: (task.category || "").trim(),
+      lastReminderSent: null,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp()
     };
@@ -170,8 +172,18 @@ export const TasksAPI = {
     return ref.id;
   },
   async update(id, updates) {
+    const payload = { ...updates };
+    if (payload.datetime) {
+      payload.datetime = new Date(payload.datetime);
+    }
+    if (payload.category != null) {
+      payload.category = (payload.category || "").trim();
+    }
+    if (payload.lastReminderSent) {
+      payload.lastReminderSent = new Date(payload.lastReminderSent);
+    }
     await updateDoc(doc(db, "tasks", id), {
-      ...updates,
+      ...payload,
       updatedAt: serverTimestamp()
     });
   },

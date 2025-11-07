@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="windows-1255">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BRF – מערכת ניהול</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="style.css">
+  <link rel="icon" href="icon-192.png">
+  <link rel="apple-touch-icon" href="icon-180.png">
+</head>
+<body data-page="admin">
+  <header class="top-nav" aria-label="ניווט ראשי">
+    <nav>
+      <a href="./index.html">רשימת משימות</a>
+      <a href="./admin.html" class="active">ניהול</a>
+      <a href="./week.html">שבוע משפחתי</a>
+    </nav>
+  </header>
+
+  <main class="page-shell admin-shell">
+    <section class="card admin-card" aria-label="הוספת ילדים">
+      <div class="sidebar-header">
+        <h2>👪 אנשים במשפחה</h2>
+      </div>
+      <nav aria-label="רשימת אנשים">
+        <ul id="people-list" class="item-list"></ul>
+      </nav>
+      <form id="person-form" class="inline-form" autocomplete="off">
+        <label for="person-name" class="visually-hidden">שם חדש</label>
+        <input id="person-name" name="person-name" type="text" placeholder="שם חדש" required>
+        <button type="submit" class="primary">הוסף</button>
+      </form>
+    </section>
+
+    <section class="card admin-card" aria-labelledby="task-form-title">
+      <h2 id="task-form-title">הוספת משימה</h2>
+      <form id="task-form" autocomplete="off">
+        <div class="form-grid">
+          <label>
+            כותרת
+            <input type="text" name="title" required>
+          </label>
+          <label>
+            תיאור
+            <textarea name="description" rows="2" placeholder="פרטים נוספים"></textarea>
+          </label>
+          <label>
+            שייך ל-
+            <select name="personId" required></select>
+          </label>
+          <label>
+            תאריך ושעה
+            <input type="datetime-local" name="datetime" required>
+          </label>
+          <label>
+            תזכורת (דקות לפני)
+            <input type="number" name="reminderBefore" min="0" step="5" value="0">
+          </label>
+          <label>
+            חזרה
+            <select name="recurring">
+              <option value="none">ללא</option>
+              <option value="daily">יומי</option>
+              <option value="weekly">שבועי</option>
+            </select>
+          </label>
+          <label>
+            סוג אירוע
+            <select name="category">
+              <option value="">ללא</option>
+              <option value="weekly_club">חוג שבועי</option>
+              <option value="birthday">יום הולדת</option>
+              <option value="school">פעילות בית ספר</option>
+              <option value="family">פעילות משפחה</option>
+              <option value="important">אירוע חשוב</option>
+            </select>
+          </label>
+        </div>
+        <button type="submit" class="accent">הוסף משימה</button>
+      </form>
+    </section>
+  </main>
+
+  <script type="module" src="./firebase.js"></script>
+  <script type="module" src="./admin.js"></script>
+</body>
+</html>
