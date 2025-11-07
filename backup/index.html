@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="windows-1255">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BRF - מנהל המשימות המשפחתי</title>
+  <meta name="theme-color" content="#1976D2">
+  <meta name="description" content="מנהל משימות משפחתי עם תזכורות והתראות בעברית">
+  <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="style.css">
+  <link rel="icon" href="icon-192.png">
+  <link rel="apple-touch-icon" href="icon-180.png">
+  <script>
+    (function () {
+      var u = new URLSearchParams(location.search).get('user');
+      if (u) { document.documentElement.className += ' user-mode'; }
+    })();
+  </script>
+</head>
+<body>
+  <!-- NAV מצבים -->
+  <nav class="mode-nav" aria-label="מצבי תצוגה">
+    <button data-mode="admin" class="active">ניהול</button>
+    <button data-mode="week">שבוע משפחתי</button>
+  </nav>
+
+  <section id="admin-screen">
+    <div class="app-shell">
+    <aside class="sidebar" aria-label="אנשים במשפחה">
+      <div class="sidebar-header">
+        <h2>👪 אנשים במשפחה</h2>
+      </div>
+      <nav>
+        <ul id="people-list" class="item-list"></ul>
+      </nav>
+      <form id="person-form" class="inline-form" autocomplete="off">
+        <label for="person-name" class="visually-hidden">שם חדש</label>
+        <input id="person-name" name="person-name" type="text" placeholder="שם חדש" required>
+        <button type="submit" class="primary">הוסף</button>
+      </form>
+    </aside>
+    <main class="main" aria-label="משימות">
+      <header class="main-header">
+        <div>
+          <h1>📝 משימות</h1>
+          <p class="subtitle">לו"ז משפחתי מסונכרן תמיד</p>
+        </div>
+        <div class="filters">
+          <label for="person-filter">הצג משימות של:</label>
+          <select id="person-filter"></select>
+        </div>
+      </header>
+
+      <section class="nextup-strip" aria-labelledby="nextup-title">
+        <div class="nextup-header">
+          <h2 id="nextup-title">הקרובים הבאים</h2>
+          <span id="nextup-count" class="count">0</span>
+        </div>
+        <div id="nextup-list" class="nextup-list" role="list" aria-live="polite"></div>
+      </section>
+
+      <section class="card" aria-labelledby="task-form-title">
+        <h2 id="task-form-title">הוספת משימה</h2>
+        <form id="task-form" autocomplete="off">
+          <div class="form-grid">
+            <label>
+              כותרת
+              <input type="text" name="title" required>
+            </label>
+            <label>
+              תיאור
+              <textarea name="description" rows="2" placeholder="פרטים נוספים"></textarea>
+            </label>
+            <label>
+              שייך ל-
+              <select name="personId" required></select>
+            </label>
+            <label>
+              תאריך ושעה
+              <input type="datetime-local" name="datetime" required>
+            </label>
+            <label>
+              תזכורת (דקות לפני)
+              <input type="number" name="reminderBefore" min="0" step="5" value="0">
+            </label>
+            <label>
+              חזרה
+              <select name="recurring">
+                <option value="none">ללא</option>
+                <option value="daily">יומי</option>
+                <option value="weekly">שבועי</option>
+              </select>
+            </label>
+
+            <!-- חדש: סוג אירוע / קטגוריה -->
+            <label>
+              סוג אירוע
+              <select name="category">
+                <option value="">ללא</option>
+                <option value="weekly_club">חוג שבועי</option>
+                <option value="birthday">יום הולדת</option>
+                <option value="school">פעילות בית ספר</option>
+                <option value="family">פעילות משפחה</option>
+                <option value="important">אירוע חשוב</option>
+              </select>
+            </label>
+          </div>
+          <button type="submit" class="accent">הוסף משימה</button>
+        </form>
+      </section>
+
+      <section class="card" aria-labelledby="task-list-title">
+        <div class="card-header">
+          <h2 id="task-list-title">📋 רשימת משימות</h2>
+          <span id="task-count" class="count">0</span>
+        </div>
+        <ul id="task-list" class="item-list tasks"></ul>
+      </section>
+    </main>
+    </div>
+  </section>
+
+  <section id="week-screen" hidden aria-label="שבוע משפחתי">
+    <div class="board">
+      <div class="days"></div>
+      <div class="rows"></div>
+    </div>
+  </section>
+
+  <!-- מסך משתמש (קריאה בלבד) -->
+  <section id="user-screen" aria-label="משימות שלי">
+    <header class="user-header">
+      <h1 id="user-title">📝 המשימות שלי</h1>
+      <button id="enable-push" class="primary" type="button">🔔 הפעלת התראות</button>
+    </header>
+
+    <section class="card">
+      <div class="card-header">
+        <h2>📋 הקרובות</h2>
+        <span id="user-task-count" class="count">0</span>
+      </div>
+      <ul id="user-task-list" class="item-list tasks"></ul>
+    </section>
+
+    <p class="hint">
+      טיפ: הוסף למסך הבית ואז אשר התראות. ב-iOS יש לוודא התקנה כ-PWA.
+    </p>
+  </section>
+
+  <script type="module" src="firebase.js"></script>
+  <script type="module">
+    import { initWeek } from './week.js';
+
+    const nav = document.querySelector('.mode-nav');
+    const admin = document.getElementById('admin-screen');
+    const week = document.getElementById('week-screen');
+    let weekInited = false;
+
+    if (!nav || document.documentElement.classList.contains('user-mode')) {
+      if (nav) {
+        nav.hidden = true;
+      }
+    } else {
+      function setMode(mode) {
+        nav.querySelectorAll('button').forEach((b) => b.classList.toggle('active', b.dataset.mode === mode));
+        const adminOn = mode === 'admin';
+        admin.hidden = !adminOn;
+        week.hidden = adminOn;
+
+        /* :   -CSS */
+        document.body.dataset.mode = mode;
+
+        if (!adminOn && !weekInited) {
+          weekInited = true;
+          initWeek();
+        }
+        try {
+          history.replaceState(null, '', `#mode=${mode}`);
+        } catch (e) {
+          console.warn('cannot update history', e);
+        }
+      }
+
+      nav.addEventListener('click', (ev) => {
+        const btn = ev.target.closest('button[data-mode]');
+        if (!btn) return;
+        setMode(btn.dataset.mode);
+      });
+
+      const initial = (location.hash || '').includes('week') ? 'week' : 'admin';
+      setMode(initial);
+    }
+  </script>
+  <script type="module" src="./app.js"></script>
+
+</body>
+</html>
