@@ -442,12 +442,36 @@ function renderNextUp(limit = 5){
       chip.style.setProperty("--nextup-text", accent.text);
     }
 
-    const kidName = kid ? kid.name : "—";
-    const timeText = toTime(t.datetime);
-    const dayLetter = toHebrewDayLetter(t.datetime);
-    const titleText = t.title || "";
+    const time = document.createElement("span");
+    time.className = "time";
+    time.textContent = toTime(t.datetime);
 
-    chip.textContent = [kidName, timeText, dayLetter, titleText].join(" || ");
+    const kidEl = document.createElement("span");
+    kidEl.className = "kid";
+    kidEl.textContent = kid ? kid.name : "—";
+
+    const title = document.createElement("span");
+    title.className = "title";
+    title.textContent = t.title || "";
+
+    chip.append(time);
+
+    const sepDot = document.createElement("span");
+    sepDot.className = "sep";
+    sepDot.textContent = "•";
+    chip.append(sepDot, kidEl);
+
+    const sepDash = document.createElement("span");
+    sepDash.className = "sep";
+    sepDash.textContent = "—";
+    chip.append(sepDash, title);
+
+    if (cat) {
+      const catBadge = document.createElement("span");
+      catBadge.className = "category";
+      catBadge.textContent = labelForCategory(cat);
+      chip.append(catBadge);
+    }
 
     nextUpListEl.append(chip);
   });
@@ -675,13 +699,6 @@ function formatDateTime(dateString) {
 function toTime(dateString){
   const d = new Date(dateString);
   return new Intl.DateTimeFormat("he-IL", { hour: '2-digit', minute: '2-digit', hour12: false }).format(d);
-}
-function toHebrewDayLetter(dateString) {
-  if (!dateString) return "";
-  const date = new Date(dateString);
-  if (!Number.isFinite(date.getTime())) return "";
-  const letters = ["א", "ב", "ג", "ד", "ה", "ו", "ש"];
-  return letters[date.getDay()] || "";
 }
 async function applyTaskPatches(patches) {
   const entries = Array.from(patches.entries());
