@@ -1,17 +1,20 @@
-const CACHE_NAME = "brf-cache-v6";
+const CACHE_NAME = "brf-cache-v7";
 const APP_SHELL = [
-  "./",
   "./index.html",
+  "./admin.html",
+  "./week.html",
+  "./child.html",
   "./style.css",
-  "./app.js",
+  "./tasks.js",
+  "./admin.js",
   "./week.js",
   "./firebase.js",
   "./manifest.json",
   "./icon-180.png",
   "./icon-192.png",
   "./icon-512.png",
-  "./child.html",
   "./child.js",
+  "./firebase-messaging-sw.js"
 ];
 
 self.addEventListener("install", (event) => {
@@ -40,7 +43,7 @@ self.addEventListener("notificationclick", (event) => {
   // פתח/פוקוס על הטאב הראשי
   event.waitUntil(
     clients.matchAll({ type: "window", includeUncontrolled: true }).then((clis) => {
-      const url = new URL("/", location.origin).toString();
+      const url = new URL("./index.html", location.origin).toString();
       for (const c of clis) {
         if ("focus" in c) return c.focus();
       }
@@ -53,6 +56,23 @@ self.addEventListener("notificationclick", (event) => {
 self.addEventListener("fetch", (event) => {
   const req = event.request;
   const url = new URL(req.url);
+
+  if (req.mode === "navigate") {
+    const segments = url.pathname.split("/").filter(Boolean);
+    const last = segments[segments.length - 1] || "index.html";
+    let fallback = null;
+    if (!last || last === "index.html") fallback = "./index.html";
+    else if (last === "admin.html") fallback = "./admin.html";
+    else if (last === "week.html") fallback = "./week.html";
+    else if (last === "child.html") fallback = "./child.html";
+
+    if (fallback) {
+      event.respondWith(
+        fetch(req).catch(() => caches.match(fallback))
+      );
+      return;
+    }
+  }
 
   // Firebase / gstatic: network-first
   if (

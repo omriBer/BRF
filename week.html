@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="windows-1255">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BRF – שבוע משפחתי</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="style.css">
+  <link rel="icon" href="icon-192.png">
+  <link rel="apple-touch-icon" href="icon-180.png">
+</head>
+<body data-page="week">
+  <header class="top-nav" aria-label="ניווט ראשי">
+    <nav>
+      <a href="./index.html">רשימת משימות</a>
+      <a href="./admin.html">ניהול</a>
+      <a href="./week.html" class="active">שבוע משפחתי</a>
+    </nav>
+  </header>
+
+  <main id="week-screen">
+    <div class="board" role="grid">
+      <div class="days" role="row"></div>
+      <div class="rows" role="rowgroup"></div>
+    </div>
+  </main>
+
+  <script type="module" src="./firebase.js"></script>
+  <script type="module" src="./week.js"></script>
+</body>
+</html>
