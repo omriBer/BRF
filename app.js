@@ -15,7 +15,6 @@ const taskFormPersonSelect = taskFormEl?.querySelector("select[name='personId']"
 const taskListEl = document.getElementById("task-list");
 const taskCountEl = document.getElementById("task-count");
 const nextUpListEl = document.getElementById("nextup-list");
-const nextUpCountEl = document.getElementById("nextup-count");
 
 init();
 
@@ -192,7 +191,6 @@ function renderPeople() {
   }
   data.people.forEach((person) => {
     const li = document.createElement("li");
-    li.classList.add("person-card");
     if (person.id === selectedPersonId) li.classList.add("active");
 
     const nameSpan = document.createElement("span");
@@ -207,27 +205,26 @@ function renderPeople() {
     const actions = document.createElement("div");
     actions.className = "actions";
 
-    const childHref = `/BRF/child.html?user=${encodeURIComponent(person.id)}`;
+    const childHref = `/child.html?user=${encodeURIComponent(person.id)}`;
     const childLink = document.createElement("a");
     childLink.className = "ghost ghost-link";
-    childLink.href = childHref;
-    childLink.target = "_blank";
-    childLink.rel = "noopener";
+    childLink.href = childHref; childLink.target = "_blank"; childLink.rel = "noopener";
     childLink.textContent = "קישור ילד";
 
+    const copyBtn = document.createElement("button");
+    copyBtn.className = "ghost"; copyBtn.type = "button"; copyBtn.textContent = "📋";
+    copyBtn.title = "העתק קישור ילד";
+    copyBtn.addEventListener("click", () => copyChildLink(person.id));
+
     const editBtn = document.createElement("button");
-    editBtn.className = "ghost";
-    editBtn.type = "button";
-    editBtn.textContent = "ערוך";
+    editBtn.className = "ghost"; editBtn.type = "button"; editBtn.textContent = "✏️";
     editBtn.addEventListener("click", () => editPerson(person.id));
 
     const deleteBtn = document.createElement("button");
-    deleteBtn.className = "ghost danger-outline";
-    deleteBtn.type = "button";
-    deleteBtn.textContent = "הסר";
+    deleteBtn.className = "ghost"; deleteBtn.type = "button"; deleteBtn.textContent = "🗑️";
     deleteBtn.addEventListener("click", () => deletePerson(person.id));
 
-    actions.append(childLink, editBtn, deleteBtn);
+    actions.append(childLink, copyBtn, editBtn, deleteBtn);
     li.append(nameSpan, actions);
     peopleListEl.append(li);
   });
@@ -320,22 +317,19 @@ function renderTasks() {
       reminderLabel.textContent = `⏰ ${task.reminderBefore || 0} דק' לפני`;
 
       // badge קטגוריה (אם קיים)
-      const fragments = [personLabel, timeLabel, reminderLabel];
+      const catLabel = document.createElement("span");
+      if (task.category) {
+        catLabel.className = "badge";
+        catLabel.textContent = labelForCategory(task.category);
+      }
 
       if (task.recurring && task.recurring !== "none") {
         const recurringLabel = document.createElement("span");
         recurringLabel.textContent = task.recurring === "daily" ? "🔁 יומי" : "🔁 שבועי";
-        fragments.push(recurringLabel);
+        meta.append(personLabel, timeLabel, reminderLabel, recurringLabel, catLabel);
+      } else {
+        meta.append(personLabel, timeLabel, reminderLabel, catLabel);
       }
-
-      if (task.category) {
-        const catLabel = document.createElement("span");
-        catLabel.className = "badge";
-        catLabel.textContent = labelForCategory(task.category);
-        fragments.push(catLabel);
-      }
-
-      meta.append(...fragments);
 
       li.append(header, description, meta);
       taskListEl.append(li);
@@ -412,13 +406,10 @@ function renderNextUp(limit = 5){
     .slice(0, limit);
 
   nextUpListEl.innerHTML = "";
-  if (nextUpCountEl) nextUpCountEl.textContent = String(tasks.length);
-
   if(!tasks.length){
     const empty = document.createElement("div");
-    empty.className = "nextup-item nextup-empty";
+    empty.className = "nextup-item";
     empty.textContent = "אין אירועים קרובים";
-    empty.setAttribute("role", "listitem");
     nextUpListEl.append(empty);
     return;
   }
@@ -426,53 +417,18 @@ function renderNextUp(limit = 5){
     const kid = findPerson(t.personId);
     const chip = document.createElement("div");
     chip.className = "nextup-item";
-    chip.setAttribute("role", "listitem");
-
-    const cat = (t.category || "").trim();
-    if (cat) {
-      chip.dataset.cat = cat;
-      chip.style.removeProperty("--nextup-bg");
-      chip.style.removeProperty("--nextup-border");
-      chip.style.removeProperty("--nextup-text");
-    } else {
-      delete chip.dataset.cat;
-      const accent = personAccent(kid?.id || "");
-      chip.style.setProperty("--nextup-bg", accent.bg);
-      chip.style.setProperty("--nextup-border", accent.border);
-      chip.style.setProperty("--nextup-text", accent.text);
-    }
+    if (t.category) chip.dataset.cat = t.category; // צבע לפי קטגוריה
 
     const time = document.createElement("span");
     time.className = "time";
     time.textContent = toTime(t.datetime);
-
     const kidEl = document.createElement("span");
     kidEl.className = "kid";
     kidEl.textContent = kid ? kid.name : "—";
-
     const title = document.createElement("span");
     title.className = "title";
     title.textContent = t.title || "";
-
-    chip.append(time);
-
-    const sepDot = document.createElement("span");
-    sepDot.className = "sep";
-    sepDot.textContent = "•";
-    chip.append(sepDot, kidEl);
-
-    const sepDash = document.createElement("span");
-    sepDash.className = "sep";
-    sepDash.textContent = "—";
-    chip.append(sepDash, title);
-
-    if (cat) {
-      const catBadge = document.createElement("span");
-      catBadge.className = "category";
-      catBadge.textContent = labelForCategory(cat);
-      chip.append(catBadge);
-    }
-
+    chip.append(time, document.createTextNode(" • "), kidEl, document.createTextNode(" — "), title);
     nextUpListEl.append(chip);
   });
 }
@@ -658,30 +614,21 @@ function computeNextOccurrence(date, recurring, now) {
   return result;
 }
 
+function copyChildLink(personId) {
+  const url = `${location.origin}/child.html?user=${encodeURIComponent(personId)}`;
+  const write = navigator.clipboard?.writeText;
+  if (write) {
+    write.call(navigator.clipboard, url).then(
+      () => showToast("קישור ילד הועתק"),
+      () => { prompt("העתק קישור ילד:", url); }
+    );
+  } else { prompt("העתק קישור ילד:", url); }
+}
+
 function ensureNotificationPermission() {
   if ("Notification" in window && Notification.permission === "default") {
     Notification.requestPermission();
   }
-}
-
-function personAccent(key) {
-  if (!key) {
-    return {
-      bg: "#f7f9fe",
-      border: "#e6ecfb",
-      text: "#1f2933",
-    };
-  }
-  let hash = 0;
-  for (let i = 0; i < key.length; i += 1) {
-    hash = (hash * 31 + key.charCodeAt(i)) & 0xffffffff;
-  }
-  hash = Math.abs(hash) % 360;
-  return {
-    bg: `hsl(${hash} 80% 95%)`,
-    border: `hsl(${hash} 60% 82%)`,
-    text: `hsl(${hash} 35% 32%)`,
-  };
 }
 
 function findPerson(id) { return data.people.find((p) => p.id === id); }
@@ -699,6 +646,14 @@ function formatDateTime(dateString) {
 function toTime(dateString){
   const d = new Date(dateString);
   return new Intl.DateTimeFormat("he-IL", { hour: '2-digit', minute: '2-digit', hour12: false }).format(d);
+}
+function showToast(message) {
+  const toast = document.createElement("div");
+  toast.className = "toast";
+  toast.textContent = message;
+  document.body.append(toast);
+  requestAnimationFrame(() => toast.classList.add("visible"));
+  setTimeout(() => { toast.classList.remove("visible"); setTimeout(() => toast.remove(), 300); }, 2200);
 }
 async function applyTaskPatches(patches) {
   const entries = Array.from(patches.entries());
